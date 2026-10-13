@@ -171,7 +171,7 @@ textarea{min-height:90px;resize:vertical}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .opt{position:relative}
 .opt input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
-.opt span{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.opt>span{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
 .opt input:checked+span{border-color:var(--primary);background:var(--tint)}
 .opt input:focus-visible+span{outline:2px solid var(--primary);outline-offset:2px}
 .sheet-actions{display:flex;gap:8px;margin-top:6px}
@@ -281,7 +281,8 @@ h1,h2,h3{font-family:var(--font)}
 .chip{min-height:40px;padding:0 14px;border-radius:999px;font-weight:700;font-size:14px;gap:8px}
 .chip[aria-pressed="true"]{background:var(--tint);border-color:var(--brand);color:var(--ink)}
 .banner{background:var(--tint);border-radius:0}
-.banner a{color:var(--brand);font-weight:800;white-space:nowrap}
+.banner a,.banner .link{color:var(--brand);font-weight:800;white-space:nowrap}
+.banner .link{min-height:32px;padding:0 4px;text-decoration:underline}
 main{padding:14px 14px 110px;max-width:1080px}
 
 /* navigation */
@@ -452,7 +453,7 @@ main{padding:14px 14px 110px;max-width:1080px}
 .sheet{border-radius:28px 28px 0 0;font-family:var(--font)}
 @media (min-width:640px){.sheet{border-radius:26px}}
 .sheet h2{font-size:19px;font-weight:800}
-.opt span{border-radius:999px;min-height:44px;font-weight:700}
+.opt>span{border-radius:999px;min-height:44px;font-weight:700}
 .opt input:checked+span{border-color:var(--brand);background:var(--tint)}
 input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;min-height:46px}
 .pop{border-radius:24px;box-shadow:0 18px 40px rgba(60,40,140,.3)}
@@ -602,9 +603,56 @@ const pname = k => k === 'all' ? 'Toute la famille' : (state.settings.names[k] |
 const initial = k => (pname(k).trim()[0] || '?').toUpperCase();
 const activePeople = () => state.settings.daughterOn ? PEOPLE.slice() : ['a','b'];
 
+/* ---------- base familiale hors claude.ai (GitHub Pages) : Firebase ---------- */
+// Configuration web du projet Firebase (console Firebase > Paramètres du projet > Vos applications).
+// Tant qu'elle vaut null, la page ouverte hors de claude.ai reste en mode local.
+const FIREBASE_CONFIG = null;
+const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const FAMILY_KEY = 'famille.firebase.code';
+const NEW_FAMILY_KEY = 'famille.firebase.new';
+const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const fmtCode = c => c.replace(/(.{4})(?=.)/g, '$1-');
+function newFamilyCode(){ const a = new Uint32Array(12); crypto.getRandomValues(a); return Array.from(a, n => CODE_ABC[n % CODE_ABC.length]).join(''); }
+function getFamilyCode(){ try { return localStorage.getItem(FAMILY_KEY) || ''; } catch(e) { return ''; } }
+function setFamilyCode(c){ try { localStorage.setItem(FAMILY_KEY, c); } catch(e) {} }
+function isNewFamily(c){ try { return localStorage.getItem(NEW_FAMILY_KEY) === c; } catch(e) { return false; } }
+let fbBase = null;
+function firebaseBase(){
+  if (!fbBase) fbBase = (async () => {
+    const [appM, authM, fsM] = await Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-auth.js'), import(FB_SDK + 'firebase-firestore.js')]);
+    const app = appM.initializeApp(FIREBASE_CONFIG);
+    const auth = authM.getAuth(app);
+    await auth.authStateReady();
+    if (!auth.currentUser) await authM.signInAnonymously(auth);
+    return {fsM, fs: fsM.initializeFirestore(app, {ignoreUndefinedProperties: true})};
+  })();
+  return fbBase;
+}
+// même interface que la base de claude.ai, rangée sous foyers/<code famille>/
+async function firebaseDb(code){
+  const {fsM, fs} = await firebaseBase();
+  const snapDoc = s => ({id: s.id, exists: s.exists(), data: () => s.data()});
+  const docApi = ref => ({
+    get: async () => snapDoc(await fsM.getDoc(ref)),
+    set: d => fsM.setDoc(ref, d),
+    update: d => fsM.updateDoc(ref, d),
+    delete: () => fsM.deleteDoc(ref),
+    onSnapshot: (next, err) => fsM.onSnapshot(ref, s => next(snapDoc(s)), err)
+  });
+  return {
+    collection: c => ({
+      doc: id => docApi(fsM.doc(fs, 'foyers', code, c, id)),
+      onSnapshot: (next, err) => fsM.onSnapshot(fsM.collection(fs, 'foyers', code, c), s => next({docs: s.docs.map(snapDoc)}), err)
+    }),
+    doc: path => docApi(fsM.doc(fs, 'foyers', code, ...path.split('/')))
+  };
+}
+
 /* ---------- stockage : base partagée (db) ou repli local ---------- */
 const store = {
   db: null,
+  backend: '',
   async init(){
     let db = null;
     try { if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db'); } catch(e) { db = null; }
@@ -615,17 +663,20 @@ const store = {
         const user = await window.claude.use('user');
         if (user) { const cw = await user.can('data.write'); if (cw === false) state.canWrite = false; }
       } catch(e) {}
-      COLS.forEach(c => {
-        db.collection(c).onSnapshot(snap => {
-          state[c] = snap.docs.map(d => Object.assign({id: d.id}, d.data()));
-          state.loaded[c] = true;
-          renderAll();
-        }, onDbError);
-      });
-      db.doc('settings/family').onSnapshot(snap => {
-        state.settings = mergeSettings(snap.exists ? snap.data() : null);
-        renderAll();
-      }, onDbError);
+      this.listen(db);
+    } else if (FIREBASE_CONFIG) {
+      this.backend = 'firebase';
+      const code = getFamilyCode();
+      if (!code) { state.mode = 'nofamily'; state.canWrite = false; renderAll(); familySheet(); return; }
+      try { db = await firebaseDb(code); }
+      catch(e) { console.error(e); state.mode = 'error'; state.canWrite = false; renderAll(); return; }
+      this.db = db;
+      state.mode = 'shared';
+      this.listen(db);
+      if (isNewFamily(code)) {
+        try { await this.seedNewFamily(); try { localStorage.removeItem(NEW_FAMILY_KEY); } catch(e) {} }
+        catch(e) { console.error(e); toast('Le foyer est créé, mais les données de cet appareil n’ont pas toutes été copiées.'); }
+      }
     } else {
       state.mode = 'local';
       COLS.forEach(c => { try { state[c] = JSON.parse(localStorage.getItem('famille.local.' + c) || '[]'); } catch(e) { state[c] = []; } state.loaded[c] = true; });
@@ -633,6 +684,30 @@ const store = {
     }
     renderAll();
     if (!ui.meSet) setTimeout(() => { if (!sheet) profileSheet(); }, 500);
+  },
+  listen(db){
+    COLS.forEach(c => {
+      db.collection(c).onSnapshot(snap => {
+        state[c] = snap.docs.map(d => Object.assign({id: d.id}, d.data()));
+        state.loaded[c] = true;
+        renderAll();
+      }, onDbError);
+    });
+    db.doc('settings/family').onSnapshot(snap => {
+      state.settings = mergeSettings(snap.exists ? snap.data() : null);
+      renderAll();
+    }, onDbError);
+  },
+  // nouveau foyer : on y recopie ce qui avait été saisi en mode local sur cet appareil (rien n'est effacé)
+  async seedNewFamily(){
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem('famille.local.settings') || 'null'); } catch(e) {}
+    await this.db.doc('settings/family').set(mergeSettings(local));
+    for (const c of COLS) {
+      let rows = [];
+      try { rows = JSON.parse(localStorage.getItem('famille.local.' + c) || '[]'); } catch(e) {}
+      for (const r of rows) if (r && r.id) await this.db.collection(c).doc(String(r.id)).set(strip(r));
+    }
   },
   localSave(c){ try { localStorage.setItem('famille.local.' + c, JSON.stringify(state[c])); } catch(e) {} },
   async set(col, id, data){
@@ -662,10 +737,11 @@ const store = {
 };
 function onDbError(err){
   if (err && err.code === 'revoked') { state.mode = 'revoked'; state.canWrite = false; renderAll(); }
+  else if (store.backend === 'firebase') { console.error(err); state.mode = 'error'; state.canWrite = false; renderAll(); }
   else { console.error(err); }
 }
 async function run(fn){
-  if (!state.canWrite) { toast('Lecture seule : ton accès ne permet pas de modifier.'); return false; }
+  if (!state.canWrite) { toast(state.mode === 'nofamily' ? 'Choisis d’abord ton foyer.' : state.mode === 'error' ? 'Base familiale injoignable : rien n’a été enregistré.' : 'Lecture seule : ton accès ne permet pas de modifier.'); return false; }
   try { await fn(); return true; }
   catch(e) { console.error(e); toast('Modification non enregistrée. Réessaie.'); return false; }
 }
@@ -1040,7 +1116,11 @@ function settingsSheet(){
     '<p class="help" style="margin-bottom:4px">Sur cet appareil :</p>' +
     '<label class="check"><input type="checkbox" name="animOn"' + (ui.fx.anim ? ' checked' : '') + '><span>Animations et confettis</span></label>' +
     '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons</span></label>' +
-    '<p class="help" style="margin-top:12px">Pour partager : ouvre le menu Partager de cette page, invite ta femme par e-mail avec le niveau « Contributeur », puis elle ouvre le même lien sur son téléphone.</p>' +
+    (store.backend === 'firebase'
+      ? '<p class="help" style="margin-top:12px">Foyer partagé, code <b>' + esc(fmtCode(getFamilyCode())) + '</b>. Sur un autre téléphone, ouvre ce même lien et entre ce code. <button type="button" class="link" data-action="family">Gérer le foyer</button></p>'
+      : state.mode === 'shared'
+        ? '<p class="help" style="margin-top:12px">Pour partager : ouvre le menu Partager de cette page, invite chaque membre par e-mail avec le niveau « Éditeur » (sans lien public), puis chacun ouvre le même lien sur son téléphone.</p>'
+        : '<p class="help" style="margin-top:12px">Ici, les données restent sur cet appareil. <a class="link" href="' + esc(SHARED_URL) + '" target="_top" rel="noopener">Ouvrir la version familiale</a></p>') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button></div>';
   openSheet('Réglages', body, async f => {
     const names = {a: val(f,'n_a') || 'Adao', b: val(f,'n_b') || 'Maman', c: val(f,'n_c') || 'Fille'};
@@ -1054,15 +1134,17 @@ function settingsSheet(){
 /* ---------- rendu global ---------- */
 function renderChrome(){
   const s = $('#sync');
-  const labels = {shared:'Partagé en direct', local:'Sur cet appareil seulement', connecting:'Connexion…', revoked:'Accès retiré'};
-  s.textContent = labels[state.mode] || ''; s.dataset.m = state.mode === 'shared' ? 'shared' : state.mode === 'local' ? 'local' : 'wait';
+  const labels = {shared:'Partagé en direct', local:'Sur cet appareil seulement', connecting:'Connexion…', revoked:'Accès retiré', nofamily:'Foyer à choisir', error:'Base familiale injoignable'};
+  s.textContent = labels[state.mode] || ''; s.dataset.m = state.mode === 'shared' ? 'shared' : (state.mode === 'local' || state.mode === 'error') ? 'local' : 'wait';
   let msg = '';
-  let link = '';
-  if (state.mode === 'local') { msg = 'Ici, les données restent sur cet appareil : la famille ne les voit pas. Pour avoir les mêmes données que tout le monde, utilise la version familiale.'; link = SHARED_URL; }
+  let link = '', btn = '';
+  if (state.mode === 'nofamily') { msg = 'Choisis ton foyer pour retrouver les données de toute la famille.'; btn = '<button type="button" class="link" data-action="family">Choisir le foyer</button>'; }
+  else if (state.mode === 'error') { msg = 'Impossible de joindre la base familiale. Vérifie la connexion, puis recharge la page.'; btn = '<button type="button" class="link" data-action="reload">Recharger</button>'; }
+  else if (state.mode === 'local') { msg = 'Ici, les données restent sur cet appareil : la famille ne les voit pas. Pour avoir les mêmes données que tout le monde, utilise la version familiale.'; link = SHARED_URL; }
   else if (state.mode === 'revoked') msg = 'Ton accès à cet espace a été retiré.';
   else if (!state.canWrite) msg = 'Lecture seule : ton accès ne permet pas de modifier. Demande au propriétaire de t\'inviter par e-mail avec le niveau « Éditeur ».';
   const b = $('#banner'); b.hidden = !msg;
-  b.innerHTML = esc(msg) + (link ? ' <a href="' + esc(link) + '" target="_top" rel="noopener">Ouvrir la version familiale</a>' : '');
+  b.innerHTML = esc(msg) + (link ? ' <a href="' + esc(link) + '" target="_top" rel="noopener">Ouvrir la version familiale</a>' : '') + (btn ? ' ' + btn : '');
   $('#btnNewTask').disabled = !state.canWrite;
   $('#btnMe').innerHTML = avatar(meOf(), 40);
   VIEWS.forEach(v => { const el = $('#view-' + v); if (el) el.hidden = v !== ui.view; });
@@ -1527,6 +1609,30 @@ function menuSheet(){
     '<div class="menu-grid">' + more.map(n => '<button type="button" class="menu-i" data-action="tab" data-v="' + n[0] + '">' + ico(n[2], 26) + '<span>' + n[1] + '</span></button>').join('') +
     '<button type="button" class="menu-i" data-action="settings">' + ico('gear', 26) + '<span>Paramètres</span></button></div>', async () => true);
 }
+function familySheet(){
+  const code = getFamilyCode();
+  const body = (code
+    ? '<p class="help">Code de ton foyer, à entrer sur les autres téléphones (même lien) :</p>' +
+      '<p class="big" style="letter-spacing:.08em">' + esc(fmtCode(code)) + '</p>' +
+      '<div class="fun-actions" style="margin-bottom:16px"><button type="button" class="btn small" data-action="copyCode">Copier le code</button></div>' +
+      '<p class="help">Rejoindre un autre foyer :</p>'
+    : '<p class="help">Pour que toute la famille ait les mêmes données, chacun utilise le même code de foyer. La première personne crée le foyer, les autres entrent son code.</p>') +
+    '<label class="fld"><span>Code du foyer</span><input type="text" name="code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="XXXX-XXXX-XXXX"></label>' +
+    '<p class="help" id="codeMsg" aria-live="polite"></p>' +
+    '<div class="sheet-actions"><button type="submit" class="btn primary">Rejoindre</button>' +
+    (code ? '' : '<button type="button" class="btn" data-action="createFamily">Créer un foyer</button>') + '</div>';
+  openSheet('Foyer partagé', body, async f => {
+    const c = cleanCode(val(f, 'code')), msg = $('#codeMsg');
+    if (c.length !== 12) { msg.textContent = 'Le code compte 12 lettres ou chiffres.'; return 'keep'; }
+    if (c === code) return true;
+    msg.textContent = 'Vérification…';
+    try {
+      const s = await (await firebaseDb(c)).doc('settings/family').get();
+      if (!s.exists) { msg.textContent = 'Aucun foyer ne correspond à ce code.'; return 'keep'; }
+    } catch(e) { console.error(e); msg.textContent = 'Connexion impossible. Vérifie le réseau, puis réessaie.'; return 'keep'; }
+    setFamilyCode(c); location.reload(); return 'keep';
+  });
+}
 function profileSheet(){
   openSheet('Qui utilise cet appareil ?',
     '<p class="help">Ton profil sert à t’accueillir, à suivre tes points et à valider les accords (échanges de corvées). Tu peux en changer à tout moment avec ton avatar en haut.</p>' +
@@ -1795,9 +1901,13 @@ document.addEventListener('click', ev => {
     case 'toggleCol': ui.hiddenCols[el.dataset.p] = !ui.hiddenCols[el.dataset.p]; savePrefs(); renderTasks(); break;
     case 'statusFilter': ui.status = el.dataset.s; savePrefs(); renderTasks(); break;
     case 'toggleDone': ui.hideDone = !ui.hideDone; savePrefs(); renderTasks(); break;
-    case 'settings': if (state.canWrite) settingsSheet(); else toast('Lecture seule.'); break;
+    case 'settings': if (state.canWrite) settingsSheet(); else if (state.mode === 'nofamily') familySheet(); else toast('Lecture seule.'); break;
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
     case 'closeSheet': closeSheet(); break;
+    case 'family': if (store.backend === 'firebase') familySheet(); break;
+    case 'reload': location.reload(); break;
+    case 'createFamily': { if (store.backend !== 'firebase' || getFamilyCode()) break; const c = newFamilyCode(); setFamilyCode(c); try { localStorage.setItem(NEW_FAMILY_KEY, c); } catch(e) {} location.reload(); break; }
+    case 'copyCode': { const c = fmtCode(getFamilyCode()); if (navigator.clipboard) navigator.clipboard.writeText(c).then(() => toast('Code copié.'), () => toast('Copie impossible : recopie le code à la main.')); else toast('Copie impossible : recopie le code à la main.'); break; }
     case 'sheetDelete': { const s = sheet; closeSheet(); if (s && s.onDelete) s.onDelete(); break; }
     case 'undo': { const u = toast.undo; $('#toast').hidden = true; toast.undo = null; if (u) u(); break; }
     case 'mic': toggleMic(); break;
