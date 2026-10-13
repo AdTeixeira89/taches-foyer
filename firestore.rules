@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Mon Foyer : chaque foyer est rangé sous foyers/<code>, un code secret de 12 caractères
+    // connu de la seule famille. Il faut être connecté (connexion anonyme Firebase) et connaître
+    // le code : aucune liste des foyers n'est possible.
+    match /foyers/{code}/{col}/{id} {
+      allow read, write: if request.auth != null
+        && code.matches('^[A-Z0-9]{12}$')
+        && col in ['tasks', 'ideas', 'events', 'points', 'weeks', 'pacts', 'jokers', 'spins', 'missions', 'settings'];
+    }
+  }
+}
