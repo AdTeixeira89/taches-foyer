@@ -18,7 +18,7 @@ Les données sont rangées dans une base Firebase (Firestore), comme pour app-sa
 2. **Build > Authentication > Get started**, puis activer le fournisseur **Anonyme**.
 3. **Build > Firestore Database > Create database** (région `europe-west`), puis onglet **Règles** : coller le contenu de `firestore.rules` et publier.
 4. **Paramètres du projet > Vos applications > Web (</>)** : enregistrer une application et copier l'objet `firebaseConfig`.
-5. Dans `index.html`, remplacer `const FIREBASE_CONFIG = null;` par cet objet (ces valeurs sont publiques, la protection vient des règles).
+5. Fait : la configuration du projet `taches-foyer` est déjà dans `index.html` (`FIREBASE_CONFIG`). Ces valeurs sont publiques, la protection vient des règles.
 6. Dans **Authentication > Settings > Authorized domains**, vérifier que `adteixeira89.github.io` est présent (sinon l'ajouter).
 
 Ensuite, sur le premier téléphone : ouvrir le lien, **Créer un foyer**. Un code de 12 caractères s'affiche (Paramètres, « Gérer le foyer »). Sur les autres téléphones : ouvrir le même lien et entrer ce code. Tout le monde voit alors les mêmes données, en direct.

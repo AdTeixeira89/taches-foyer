@@ -606,7 +606,14 @@ const activePeople = () => state.settings.daughterOn ? PEOPLE.slice() : ['a','b'
 /* ---------- base familiale hors claude.ai (GitHub Pages) : Firebase ---------- */
 // Configuration web du projet Firebase (console Firebase > Paramètres du projet > Vos applications).
 // Tant qu'elle vaut null, la page ouverte hors de claude.ai reste en mode local.
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB8HXhrtFJyC-zelf3KE4KA2yPKMPbNRII",
+  authDomain: "taches-foyer.firebaseapp.com",
+  projectId: "taches-foyer",
+  storageBucket: "taches-foyer.firebasestorage.app",
+  messagingSenderId: "391719656519",
+  appId: "1:391719656519:web:d5d2cec57ed372447f2562"
+};
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const FAMILY_KEY = 'famille.firebase.code';
 const NEW_FAMILY_KEY = 'famille.firebase.new';
