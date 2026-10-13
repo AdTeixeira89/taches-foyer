@@ -355,6 +355,7 @@ main{padding:14px 14px 110px;max-width:1080px}
 .tcard.s-done .title{text-decoration:line-through;color:var(--muted)}
 .assign{display:flex;gap:4px;flex:none}
 .av-btn{border-radius:50%;line-height:0;padding:2px}
+@media (max-width:520px){.tcard{flex-wrap:wrap}.tcard .assign{width:100%;justify-content:flex-end;gap:8px;padding:0 0 2px}}
 .empty{color:var(--muted);font-size:13.5px;padding:10px 4px;text-align:center;border:1px dashed var(--line);border-radius:16px}
 @media (max-width:720px){.cols{grid-template-columns:1fr!important}}
 
@@ -803,7 +804,7 @@ function taskCard(t, assign){
     (t.due ? '<span class="pill' + (late ? ' late' : '') + '">' + ico('cal', 12) + esc(relDate(t.due)) + '</span>' : '') +
     (s === 'doing' ? '<span class="pill doing">En cours</span>' : '') + (s === 'done' ? '<span class="pill okp">Fait</span>' : '');
   const av = assign ? '<span class="assign">' + activePeople().map(p =>
-    '<button type="button" class="av-btn" data-action="assign" data-id="' + esc(t.id) + '" data-p="' + p + '" aria-label="Attribuer à ' + esc(pname(p)) + '" title="' + esc(pname(p)) + '">' + avatar(p, 34) + '</button>').join('') + '</span>' : '';
+    '<button type="button" class="av-btn" data-action="assign" data-id="' + esc(t.id) + '" data-p="' + p + '" aria-label="Attribuer à ' + esc(pname(p)) + '" title="' + esc(pname(p)) + '">' + avatar(p, 40) + '</button>').join('') + '</span>' : '';
   return '<li class="tcard tier-' + tier + ' s-' + s + '">' +
     '<button type="button" class="st" data-action="cycle" data-id="' + esc(t.id) + '" aria-label="' + STATUS[s] + ' : changer le statut">' + statusRing(s) + '</button>' +
     '<button type="button" class="tmain" data-action="editTask" data-id="' + esc(t.id) + '">' +
@@ -817,7 +818,7 @@ function renderTasks(){
   const statusOpts = [['all','Toutes'],['todo','À faire'],['doing','En cours'],['done','Faites']];
   $('#filters').innerHTML =
     '<div class="bar-row" role="group" aria-label="Colonnes affichées">' +
-      people.map(p => '<button type="button" class="chip" data-action="toggleCol" data-p="' + p + '" aria-pressed="' + (!ui.hiddenCols[p]) + '">' + avatar(p, 22) + esc(pname(p)) + '</button>').join('') +
+      people.map(p => '<button type="button" class="chip" data-action="toggleCol" data-p="' + p + '" aria-pressed="' + (!ui.hiddenCols[p]) + '">' + avatar(p, 28) + esc(pname(p)) + '</button>').join('') +
     '</div>' +
     '<div class="bar-row" role="group" aria-label="Filtrer par statut">' +
       statusOpts.map(o => '<button type="button" class="chip" data-action="statusFilter" data-s="' + o[0] + '" aria-pressed="' + (ui.status === o[0]) + '">' + o[1] + '</button>').join('') +
@@ -841,7 +842,7 @@ function renderTasks(){
   cols.innerHTML = vis.map(p => {
     const mine = list.filter(t => t.owner === p);
     const open = state.tasks.filter(t => t.owner === p && t.status !== 'done').length;
-    return '<div class="col" style="--pc:' + COLORS[p] + '"><div class="col-h">' + avatar(p, 34) + '<span class="nm">' + esc(pname(p)) + '</span><span class="ct">' + open + ' à faire</span>' +
+    return '<div class="col" style="--pc:' + COLORS[p] + '"><div class="col-h">' + avatar(p, 44) + '<span class="nm">' + esc(pname(p)) + '</span><span class="ct">' + open + ' à faire</span>' +
       '<button type="button" class="add" data-action="newTask" data-p="' + p + '" aria-label="Ajouter une tâche pour ' + esc(pname(p)) + '">+</button></div>' +
       (mine.length ? '<ul class="list">' + mine.map(t => taskCard(t, false)).join('') + '</ul>' : '<p class="empty">Rien ici pour le moment</p>') + '</div>';
   }).join('');
@@ -1031,7 +1032,7 @@ function settingsSheet(){
   const body =
     '<p class="help">Les prénoms et la colonne de ta fille sont partagés avec toute la famille.</p>' +
     ['a','b','c'].map(k => '<label class="fld"><span>' + (k === 'a' ? 'Premier prénom' : k === 'b' ? 'Deuxième prénom' : 'Troisième prénom') + '</span><input type="text" name="n_' + k + '" maxlength="24" autocomplete="off" value="' + esc(s.names[k]) + '"></label>').join('') +
-    activePeople().map(p => '<div class="fld"><span class="lab">Avatar de ' + esc(pname(p)) + '</span><div class="seg">' + AVATARS.map(a => '<label class="opt"><input type="radio" name="av_' + p + '" value="' + a + '"' + (s.avatars[p] === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(p, 34, a) + '</span></label>').join('') + '</div></div>').join('') +
+    activePeople().map(p => '<div class="fld"><span class="lab">Avatar de ' + esc(pname(p)) + '</span><div class="seg">' + AVATARS.map(a => '<label class="opt"><input type="radio" name="av_' + p + '" value="' + a + '"' + (s.avatars[p] === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(p, 48, a) + '</span></label>').join('') + '</div></div>').join('') +
     '<label class="check"><input type="checkbox" name="daughterOn"' + (s.daughterOn ? ' checked' : '') + '><span>Utiliser la colonne de ma fille</span></label>' +
     '<label class="fld" style="margin-top:10px"><span>Défi de la famille : tâches à terminer par semaine</span><input type="text" inputmode="numeric" name="goal" maxlength="2" value="' + esc(s.goal) + '"></label>' +
     '<label class="fld"><span>Récompense du défi</span><input type="text" name="collReward" maxlength="60" autocomplete="off" value="' + esc(s.collReward) + '"></label>' +
@@ -1426,7 +1427,7 @@ const FACES = {
 function avatar(who, size, kind){
   const s = size || 40;
   const k = kind || (state.settings.avatars && state.settings.avatars[who]) || 'fox';
-  return '<span class="av" style="--pc:' + (COLORS[who] || COLORS.all) + ';width:' + s + 'px;height:' + s + 'px"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="24" style="fill:var(--pc)"/>' + (FACES[k] || FACES.fox) + '</svg></span>';
+  return '<span class="av" style="--pc:' + (COLORS[who] || COLORS.all) + ';width:' + s + 'px;height:' + s + 'px"><svg viewBox="5 6 38 38" aria-hidden="true"><circle cx="24" cy="24" r="24" style="fill:var(--pc)"/>' + (FACES[k] || FACES.fox) + '</svg></span>';
 }
 
 const LEVEL_STEP = 20;
@@ -1529,7 +1530,7 @@ function menuSheet(){
 function profileSheet(){
   openSheet('Qui utilise cet appareil ?',
     '<p class="help">Ton profil sert à t’accueillir, à suivre tes points et à valider les accords (échanges de corvées). Tu peux en changer à tout moment avec ton avatar en haut.</p>' +
-    '<div class="menu-grid">' + activePeople().map(p => '<button type="button" class="menu-i' + (p === meOf() ? ' on' : '') + '" data-action="setMe" data-p="' + p + '">' + avatar(p, 52) + '<span>' + esc(pname(p)) + '</span></button>').join('') + '</div>', async () => true);
+    '<div class="menu-grid">' + activePeople().map(p => '<button type="button" class="menu-i' + (p === meOf() ? ' on' : '') + '" data-action="setMe" data-p="' + p + '">' + avatar(p, 68) + '<span>' + esc(pname(p)) + '</span></button>').join('') + '</div>', async () => true);
 }
 
 /* ===== petites briques communes ===== */
@@ -1540,7 +1541,7 @@ const visibleSpins = () => state.spins.filter(s => !revealing.has(s.id));
 function xpBar(info){ return '<div class="xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="' + info.need + '" aria-valuenow="' + info.into + '"><b style="width:' + info.pct + '%"></b></div>'; }
 function bcard(o){
   return '<article class="bcard">' + o.art + '<div class="bc-b"><h3>' + esc(o.title) + '</h3>' + (o.desc ? '<p>' + esc(o.desc) + '</p>' : '') +
-    (o.cond ? '<p class="muted">' + esc(o.cond) + '</p>' : '') + (o.who ? '<p class="by">' + avatar(o.who, 20) + '<span>' + esc(pname(o.who)) + '</span></p>' : '') + '</div>' +
+    (o.cond ? '<p class="muted">' + esc(o.cond) + '</p>' : '') + (o.who ? '<p class="by">' + avatar(o.who, 28) + '<span>' + esc(pname(o.who)) + '</span></p>' : '') + '</div>' +
     '<div class="bc-s"><span class="status s-' + o.kind + '">' + esc(o.status) + '</span>' + (o.action || '') + '</div></article>';
 }
 function collectiveCard(){
@@ -1581,7 +1582,7 @@ function leaderCard(){
   const wk = curWeek(), t = totalsOf(wk), ppl = peopleFor(wk), ch = championOf(wk), sunday = new Date().getDay() === 0;
   const max = Math.max(1, Math.max.apply(null, ppl.map(p => t[p]))), prevC = championOf(prevWeek());
   return '<section class="card"><header class="card-h">' + IC.trophy(20) + '<h2>Classement de la semaine</h2><span class="muted">' + esc(weekLabel(wk)) + '</span></header>' +
-    ppl.map(p => '<div class="lb" style="--pc:' + COLORS[p] + '">' + avatar(p, 36) + '<span class="lb-n">' + esc(pname(p)) + (sunday && ch.list.indexOf(p) >= 0 ? '<span class="trophy">' + IC.trophy(16) + '</span>' : '') + '</span>' +
+    ppl.map(p => '<div class="lb" style="--pc:' + COLORS[p] + '">' + avatar(p, 48) + '<span class="lb-n">' + esc(pname(p)) + (sunday && ch.list.indexOf(p) >= 0 ? '<span class="trophy">' + IC.trophy(16) + '</span>' : '') + '</span>' +
       '<span class="lb-bar"><b style="width:' + Math.round(t[p] / max * 100) + '%"></b></span><span class="lb-p">' + t[p] + ' pts</span></div>').join('') +
     (ch.max === 0 ? '<p class="muted">Aucun point pour l’instant. Une petite tâche suffit pour démarrer.</p>'
       : sunday ? '<p class="big" style="margin-top:10px">Champion de la semaine : ' + esc(namesOf(ch.list)) + '</p><button type="button" class="btn" data-action="celebrate">Fêter ça</button>'
@@ -1707,7 +1708,7 @@ function renderHome(){
   const jk = Object.keys(JOKERS).reduce((s, k) => s + jokersLeft(me, k), 0);
   const waiting = visibleSpins().filter(s => s.who === me && !s.used && s.prize !== 'joker').length;
   const ppl = peopleFor(wk), t = totalsOf(wk);
-  let h = '<section class="hero">' + avatar(me, 68) + '<div class="hero-t"><p class="hello">' + hello + ',</p><h1>' + esc(pname(me)) + '</h1>' +
+  let h = '<section class="hero">' + avatar(me, 80) + '<div class="hero-t"><p class="hello">' + hello + ',</p><h1>' + esc(pname(me)) + '</h1>' +
     '<p class="pills"><span class="pill glass">Niveau ' + lv.level + ' ' + esc(lv.title) + '</span>' + (st ? '<span class="pill glass">' + IC.flame(12) + st + ' jour' + (st > 1 ? 's' : '') + '</span>' : '') + '</p></div>' +
     '<div class="hero-pts"><b>' + lv.total + '</b><span>points</span></div>' +
     '<div class="xp">' + xpBar(lv) + '<p>' + lv.into + ' / ' + lv.need + ' points vers le niveau ' + (lv.level + 1) + '</p></div></section>';
@@ -1730,7 +1731,7 @@ function renderHome(){
     '<button type="button" class="tile" data-action="tab" data-v="bonus">' + art('gift', 44) + '<b>' + waiting + '</b><span>bonus à utiliser</span></button></div></section>';
   h += collectiveCard();
   h += '<section class="card"><header class="card-h">' + IC.trophy(20) + '<h2>Cette semaine en famille</h2></header>' +
-    '<div class="mini-lb">' + ppl.map(p => '<div style="--pc:' + COLORS[p] + '">' + avatar(p, 44) + '<b>' + t[p] + '</b><span>' + esc(pname(p)) + '</span></div>').join('') + '</div>' +
+    '<div class="mini-lb">' + ppl.map(p => '<div style="--pc:' + COLORS[p] + '">' + avatar(p, 56) + '<b>' + t[p] + '</b><span>' + esc(pname(p)) + '</span></div>').join('') + '</div>' +
     '<button type="button" class="link" data-action="tab" data-v="family">Voir la famille et le classement</button></section>';
   h += '</div></div>';
   $('#homebody').innerHTML = h;
@@ -1748,7 +1749,7 @@ function renderFamily(){
     const lv = levelInfo(p), done = state.points.filter(x => x.who === p).length, bd = badgesOf(p);
     const recent = state.points.filter(x => x.who === p).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 2);
     const jkLeft = Object.keys(JOKERS).reduce((s, k) => s + jokersLeft(p, k), 0);
-    return '<article class="pcard" style="--pc:' + COLORS[p] + '">' + avatar(p, 60) + '<div class="pc-b"><h3>' + esc(pname(p)) + (sunday && ch.list.indexOf(p) >= 0 ? '<span class="trophy">' + IC.trophy(18) + '</span>' : '') + '</h3>' +
+    return '<article class="pcard" style="--pc:' + COLORS[p] + '">' + avatar(p, 76) + '<div class="pc-b"><h3>' + esc(pname(p)) + (sunday && ch.list.indexOf(p) >= 0 ? '<span class="trophy">' + IC.trophy(18) + '</span>' : '') + '</h3>' +
       '<p class="muted" style="margin:0">Niveau ' + lv.level + ' ' + esc(lv.title) + '</p>' + xpBar(lv) +
       '<div class="stats"><span><b>' + tw[p] + '</b> pts cette semaine</span><span><b>' + lv.total + '</b> au total</span><span><b>' + done + '</b> tâches</span><span><b>' + jkLeft + '</b> joker' + (jkLeft > 1 ? 's' : '') + '</span></div>' +
       '<div class="mini-badges">' + BADGES.map(b => '<span class="mb' + (bd[b.id] ? ' on' : '') + '" title="' + esc(b.name) + '">' + IC[b.icon](16) + '</span>').join('') + '</div>' +
@@ -1772,7 +1773,7 @@ function renderHistory(){
     (weeks.length ? '<ul class="list">' + weeks.slice(0, histAll ? 99 : 6).map(weekRow).join('') + '</ul>' + (weeks.length > 6 ? '<button type="button" class="link" data-action="histToggle">' + (histAll ? 'Voir moins' : 'Voir tout (' + weeks.length + ')') + '</button>' : '')
       : '<p class="muted">L’historique se remplit à la fin de chaque semaine.</p>') + '</section>';
   h += '<section class="card"><header class="card-h">' + IC.star(20) + '<h2>Dernières réussites</h2></header>' +
-    (recent.length ? '<ul class="list">' + recent.map(p => '<li class="feed" style="--pc:' + COLORS[p.who] + '">' + avatar(p.who, 34) + '<span class="feed-t"><b>' + esc(p.title || 'Tâche') + '</b><span class="muted">' + esc(pname(p.who)) + (p.day ? ', ' + esc(relDate(p.day)) : '') + '</span></span><span class="pill pts">' + IC.star(12) + '+' + (Number(p.pts) || 0) + '</span></li>').join('') + '</ul>'
+    (recent.length ? '<ul class="list">' + recent.map(p => '<li class="feed" style="--pc:' + COLORS[p.who] + '">' + avatar(p.who, 44) + '<span class="feed-t"><b>' + esc(p.title || 'Tâche') + '</b><span class="muted">' + esc(pname(p.who)) + (p.day ? ', ' + esc(relDate(p.day)) : '') + '</span></span><span class="pill pts">' + IC.star(12) + '+' + (Number(p.pts) || 0) + '</span></li>').join('') + '</ul>'
       : '<p class="muted">Aucune tâche terminée pour l’instant.</p>') + '</section>';
   const spins = visibleSpins().sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 6);
   if (spins.length) h += '<section class="card"><header class="card-h">' + IC.ticket(20) + '<h2>Résultats de la roulette</h2></header>' + spins.map(s => bcard(prizeCardData(s))).join('') + '</section>';
