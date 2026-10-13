@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap">
+<meta name="theme-color" content="#6c4cf1">
+<meta name="apple-mobile-web-app-title" content="Mon Foyer">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <title>Mon Foyer</title>
 <style>
 :root{
@@ -107,24 +113,11 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 .pool{margin:2px 0 10px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px}
 .pool h3{margin:0 0 2px;font-size:13px;font-weight:600;color:var(--muted)}
 
-/* ideas */
-.composer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:12px}
-.mic{width:68px;height:68px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;
-  box-shadow:0 0 0 0 transparent;transition:box-shadow .2s}
-.mic[aria-pressed="true"]{animation:pulse 1.4s ease-out infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 55%,transparent)}100%{box-shadow:0 0 0 18px transparent}}
-@media (prefers-reduced-motion: reduce){.mic[aria-pressed="true"]{animation:none;box-shadow:0 0 0 6px color-mix(in srgb,var(--primary) 35%,transparent)}.sheet{animation:none!important}}
-.mic-hint{font-size:13px;color:var(--muted);min-height:18px;text-align:center}
-.idea-row{display:flex;gap:8px;width:100%}
-.idea-row input{flex:1;min-width:0}
+/* champs de saisie */
+@media (prefers-reduced-motion: reduce){.sheet{animation:none!important}}
 input[type=text],input[type=date],input[type=time],textarea{width:100%;min-height:42px;padding:8px 11px;font-size:16px;
   border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 textarea{min-height:90px;resize:vertical}
-.idea{display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-top:1px solid var(--line)}
-.idea:first-child{border-top:0}
-.idea .it{flex:1;min-width:0;padding:7px 0}
-.idea .x{width:36px;height:36px;color:var(--muted);display:grid;place-items:center;font-size:20px}
-.mini{min-height:34px;padding:0 10px;margin-top:3px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--primary);white-space:nowrap}
 
 /* calendar */
 .cal-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
@@ -269,7 +262,7 @@ h1,h2,h3{font-family:var(--font)}
 
 /* en-tête */
 .top{background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:0;padding:10px 14px;gap:10px;min-height:62px}
-.logo{width:38px;height:38px;border-radius:12px;background:var(--grad);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 4px 12px rgba(108,76,241,.35)}
+.logo{width:42px;height:42px;display:block;flex:none;filter:drop-shadow(0 4px 8px rgba(108,76,241,.35))}
 .brand b{font-size:18px;font-weight:800;letter-spacing:-.01em}
 .me-btn{width:44px;height:44px;border-radius:50%;padding:0;display:grid;place-items:center;box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--tint)}
 .btn{min-height:46px;border-radius:16px;font-weight:700;padding:0 18px;border:1px solid var(--line);background:var(--surface);box-shadow:0 1px 0 rgba(0,0,0,.03)}
@@ -461,13 +454,11 @@ input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;m
 .pop .xpbar{margin:10px 6px 0}
 .toast{border-radius:16px;font-weight:700}
 
-/* calendrier, idées : mêmes codes visuels */
+/* calendrier : mêmes codes visuels */
 .day{border-radius:0;background:var(--surface)}
 .day.today .n{background:var(--grad)}
 .upnext{border-radius:18px}
 .seg-top{border-radius:14px}
-.idea .it{padding:10px 0}
-.mic{width:76px;height:76px;background:var(--grad);box-shadow:0 8px 20px rgba(108,76,241,.4)}
 @media (prefers-reduced-motion: reduce){.result .burst{animation:none}.xpbar b,.prog b,.lb-bar b{transition:none}}
 
 /* finitions */
@@ -486,7 +477,7 @@ input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;m
 </head>
 <body>
 <header class="top">
-  <span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/></svg></span>
+  <span class="logo" aria-hidden="true"><svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><linearGradient id="mf-hd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7a5cff"/><stop offset="1" stop-color="#3d7bff"/></linearGradient><clipPath id="mf-hd-clip"><rect width="512" height="512" rx="116"/></clipPath></defs><rect width="512" height="512" rx="116" fill="url(#mf-hd)"/><circle cx="430" cy="82" r="150" fill="#fff" opacity=".10" clip-path="url(#mf-hd-clip)"/><path d="M256 84 76 238c-12 11-5 31 11 31h33v136c0 22 18 40 40 40h192c22 0 40-18 40-40V269h33c16 0 23-20 11-31z" fill="#fff" stroke="#fff" stroke-width="14" stroke-linejoin="round"/><circle cx="196" cy="318" r="37" fill="#3d7bff"/><circle cx="316" cy="318" r="37" fill="#ff6f61"/><circle cx="256" cy="382" r="27" fill="#18bfae"/><path d="M256 150l17 35 38 5-28 27 7 38-34-18-34 18 7-38-28-27 38-5z" fill="#ffc83d" transform="translate(0 -6) scale(.92) translate(22 4)"/></svg></span>
   <div class="brand"><b>Mon Foyer</b><span id="sync" class="sync" data-m="wait">Connexion…</span></div>
   <button id="btnMe" class="me-btn" data-action="profile" aria-label="Changer de profil"></button>
   <button id="btnNewTask" class="btn primary" data-action="newTask">+ Tâche</button>
@@ -505,20 +496,6 @@ input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;m
   <section id="view-cal" aria-label="Calendrier" hidden>
     <div id="calbar" class="cal-bar"></div>
     <div id="calbody"></div>
-  </section>
-
-  <section id="view-ideas" aria-label="Idées" hidden>
-    <form id="ideaForm" class="composer" novalidate>
-      <button type="button" id="mic" class="mic" data-action="mic" aria-pressed="false" aria-label="Dicter une idée">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-      </button>
-      <div id="micHint" class="mic-hint" aria-live="polite">Appuie pour dicter une idée</div>
-      <div class="idea-row">
-        <input id="ideaInput" type="text" maxlength="300" autocomplete="off" enterkeyhint="done" placeholder="Ou écris une idée…" aria-label="Nouvelle idée">
-        <button type="submit" class="btn">Ajouter</button>
-      </div>
-    </form>
-    <ul id="ideaList" class="list"></ul>
   </section>
 
   <section id="view-fun" aria-label="Défis" hidden>
@@ -578,6 +555,7 @@ const PEOPLE = ['a','b','c'];
 const COLORS = {a:'var(--c-a)', b:'var(--c-b)', c:'var(--c-c)', all:'var(--c-all)'};
 const STATUS = {todo:'À faire', doing:'En cours', done:'Fait'};
 const NEXT = {todo:'doing', doing:'done', done:'todo'};
+// 'ideas' : section retirée de l'interface, mais la collection est conservée (rien n'est effacé)
 const COLS = ['tasks','ideas','events','points','weeks','pacts','jokers','spins','missions'];
 /* page publiée sur claude.ai : seule version où les données sont communes à toute la famille */
 const SHARED_URL = 'https://claude.ai/artifact/XyDceVrGTqUB2qQG4faGsM';
@@ -931,89 +909,6 @@ function renderTasks(){
   }).join('');
 }
 
-/* ---------- idées + dictée ---------- */
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false;
-function cap(s){ s = (s || '').trim(); return s ? s[0].toUpperCase() + s.slice(1) : s; }
-function setMic(on, hint){
-  listening = on;
-  $('#mic').setAttribute('aria-pressed', on ? 'true' : 'false');
-  $('#mic').setAttribute('aria-label', on ? 'Arrêter la dictée' : 'Dicter une idée');
-  if (hint != null) $('#micHint').textContent = hint;
-}
-function toggleMic(){
-  if (!SR) { setMic(false, 'Dictée indisponible ici : écris l’idée, ou utilise le micro de ton clavier.'); return; }
-  if (listening && rec) { rec.stop(); return; }
-  const input = $('#ideaInput');
-  const base = input.value.trim();
-  let finalText = '';
-  try {
-    rec = new SR();
-    rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = false;
-    rec.onresult = e => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
-      }
-      input.value = cap((base + ' ' + finalText + interim).trim());
-    };
-    rec.onerror = e => {
-      const code = e && e.error;
-      if (code === 'not-allowed' || code === 'service-not-allowed') setMic(false, 'Micro bloqué : autorise-le, ou utilise le micro de ton clavier.');
-      else if (code === 'no-speech') setMic(false, 'Rien entendu. Réessaie.');
-      else if (code !== 'aborted') setMic(false, 'Dictée interrompue. Réessaie ou écris l’idée.');
-    };
-    rec.onend = async () => {
-      const heard = finalText.trim();
-      const was = $('#micHint').textContent;
-      setMic(false, was.indexOf('Écoute') === 0 ? 'Appuie pour dicter une idée' : null);
-      if (heard) { const ok = await addIdea(input.value); if (ok) { input.value = ''; $('#micHint').textContent = 'Idée enregistrée'; } }
-    };
-    rec.start();
-    setMic(true, 'Écoute… parle maintenant');
-  } catch(e) {
-    setMic(false, 'Dictée indisponible ici : écris l’idée, ou utilise le micro de ton clavier.');
-  }
-}
-async function addIdea(text){
-  text = cap(text);
-  if (!text) return false;
-  return run(() => store.set('ideas', uid(), {text, createdAt: Date.now()}));
-}
-function renderIdeas(){
-  const items = state.ideas.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  $('#ideaList').innerHTML = items.length ? items.map(i =>
-    '<li class="idea"><button type="button" class="it" data-action="editIdea" data-id="' + esc(i.id) + '"><span class="title">' + esc(i.text) + '</span>' +
-    (i.createdAt ? '<span class="meta">' + esc(fmtDM.format(new Date(i.createdAt))) + '</span>' : '') + '</button>' +
-    '<button type="button" class="mini" data-action="ideaToTask" data-id="' + esc(i.id) + '">En tâche</button>' +
-    '<button type="button" class="x" data-action="delIdea" data-id="' + esc(i.id) + '" aria-label="Supprimer l’idée">×</button></li>').join('')
-    : '<li class="empty">Aucune idée pour l’instant. Appuie sur le micro pour en dicter une.</li>';
-}
-function ideaSheet(i){
-  const body = '<label class="fld"><span>Idée</span><textarea name="text" maxlength="300">' + esc(i.text) + '</textarea></label>' +
-    '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button><button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button></div>';
-  openSheet('Modifier l’idée', body, async f => {
-    const text = cap(val(f, 'text'));
-    if (!text) { f.elements.text.focus(); return false; }
-    return run(() => store.set('ideas', i.id, Object.assign(strip(i), {text})));
-  }, {onDelete: () => deleteWithUndo('ideas', i, 'Idée supprimée')});
-}
-function ideaToTaskSheet(i){
-  const owners = [['', 'Personne', 'var(--done)']].concat(activePeople().map(p => [p, pname(p), COLORS[p]]));
-  const body = '<p class="help">« ' + esc(i.text) + ' »</p>' +
-    '<div class="fld"><span class="lab">Responsable</span>' + radios('owner', owners, '') + '</div>' +
-    '<div class="sheet-actions"><button type="submit" class="btn primary">Créer la tâche</button></div>';
-  openSheet('Transformer en tâche', body, async f => {
-    const owner = radio(f, 'owner');
-    return run(async () => {
-      await store.set('tasks', uid(), {title: i.text, owner, status:'todo', due:'', createdAt: Date.now()});
-      await store.remove('ideas', i.id);
-      toast('Idée transformée en tâche');
-    });
-  });
-}
-
 /* ---------- calendrier ---------- */
 function evSort(a, b){
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -1160,7 +1055,7 @@ function renderChrome(){
 function renderAll(){
   if (VIEWS.indexOf(ui.view) < 0) ui.view = 'home';
   renderChrome();
-  const r = {home: renderHome, tasks: renderTasks, fun: renderChallenges, wheel: renderWheel, bonus: renderBonus, family: renderFamily, history: renderHistory, cal: renderCal, ideas: renderIdeas};
+  const r = {home: renderHome, tasks: renderTasks, fun: renderChallenges, wheel: renderWheel, bonus: renderBonus, family: renderFamily, history: renderHistory, cal: renderCal};
   r[ui.view]();
   finalizeWeeks(); maybeCelebrate();
 }
@@ -1590,7 +1485,6 @@ const NAVIC = {
   grid: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
   users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-5.5 6-5.5s6 2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17.5 14.5c2.5.3 4 2 4 4.5"/>',
   cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
-  bulb: '<path d="M9 18h6M10 21h4M12 3.5a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V17h5v-.6c0-.8.4-1.5 1-2A6 6 0 0 0 12 3.5z"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>'
 };
@@ -1600,9 +1494,9 @@ function ico(name, size){
 }
 
 /* ===== navigation ===== */
-const VIEWS = ['home','tasks','fun','wheel','bonus','family','history','cal','ideas'];
+const VIEWS = ['home','tasks','fun','wheel','bonus','family','history','cal'];
 const NAV = [['home','Accueil','home'], ['tasks','Tâches','list'], ['fun','Défis','flame'], ['wheel','Roulette','wheel'], ['bonus','Bonus','gift'],
-  ['family','Famille','users'], ['cal','Calendrier','cal'], ['ideas','Idées','bulb'], ['history','Historique','clock']];
+  ['family','Famille','users'], ['cal','Calendrier','cal'], ['history','Historique','clock']];
 const BOTTOM = ['home','tasks','fun','wheel','bonus'];
 function renderNav(){
   const item = (n, cls) => '<button type="button" class="' + cls + '" data-action="tab" data-v="' + n[0] + '"' + (ui.view === n[0] ? ' aria-current="page"' : '') + '>' + ico(n[2], 22) + '<span>' + n[1] + '</span></button>';
@@ -1917,10 +1811,6 @@ document.addEventListener('click', ev => {
     case 'copyCode': { const c = fmtCode(getFamilyCode()); if (navigator.clipboard) navigator.clipboard.writeText(c).then(() => toast('Code copié.'), () => toast('Copie impossible : recopie le code à la main.')); else toast('Copie impossible : recopie le code à la main.'); break; }
     case 'sheetDelete': { const s = sheet; closeSheet(); if (s && s.onDelete) s.onDelete(); break; }
     case 'undo': { const u = toast.undo; $('#toast').hidden = true; toast.undo = null; if (u) u(); break; }
-    case 'mic': toggleMic(); break;
-    case 'editIdea': { const i = byId('ideas', id); if (i && state.canWrite) ideaSheet(i); break; }
-    case 'delIdea': { const i = byId('ideas', id); if (i) deleteWithUndo('ideas', i, 'Idée supprimée'); break; }
-    case 'ideaToTask': { const i = byId('ideas', id); if (i && state.canWrite) ideaToTaskSheet(i); break; }
     case 'calMode': ui.calMode = el.dataset.m; savePrefs(); renderCal(); break;
     case 'calPrev': case 'calNext': {
       const k = a === 'calNext' ? 1 : -1;
@@ -1958,11 +1848,6 @@ document.addEventListener('click', ev => {
   }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && sheet) closeSheet(); });
-$('#ideaForm').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  const input = $('#ideaInput');
-  if (await addIdea(input.value)) { input.value = ''; $('#micHint').textContent = 'Idée enregistrée'; }
-});
 
 renderAll();
 store.init();

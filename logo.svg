@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Mon Foyer">
+  <defs>
+    <linearGradient id="mf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a5cff"/>
+      <stop offset="1" stop-color="#3d7bff"/>
+    </linearGradient>
+    <clipPath id="mf-clip"><rect width="512" height="512" rx="116"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#mf-bg)"/>
+  <circle cx="430" cy="82" r="150" fill="#fff" opacity=".10" clip-path="url(#mf-clip)"/>
+  <path d="M256 84 76 238c-12 11-5 31 11 31h33v136c0 22 18 40 40 40h192c22 0 40-18 40-40V269h33c16 0 23-20 11-31z" fill="#fff" stroke="#fff" stroke-width="14" stroke-linejoin="round"/>
+  <circle cx="196" cy="318" r="37" fill="#3d7bff"/>
+  <circle cx="316" cy="318" r="37" fill="#ff6f61"/>
+  <circle cx="256" cy="382" r="27" fill="#18bfae"/>
+  <path d="M256 150l17 35 38 5-28 27 7 38-34-18-34 18 7-38-28-27 38-5z" fill="#ffc83d" transform="translate(0 -6) scale(.92) translate(22 4)"/>
+</svg>

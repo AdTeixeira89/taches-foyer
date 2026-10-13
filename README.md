@@ -1,8 +1,8 @@
 # Mon Foyer
 
-Application familiale : tâches, calendrier partagé, idées avec dictée vocale, points, défis, bonus et roulette des récompenses.
+Application familiale : tâches, calendrier partagé, points, défis, bonus et roulette des récompenses.
 
-Une seule page HTML autonome (`index.html`), sans installation.
+Une seule page HTML autonome (`index.html`), sans installation. Le logo (`logo.svg`, icônes PNG et `manifest.json`) sert d'icône d'onglet et d'écran d'accueil du téléphone.
 
 ## Lien de l'application
 
