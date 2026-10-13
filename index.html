@@ -281,6 +281,7 @@ h1,h2,h3{font-family:var(--font)}
 .chip{min-height:40px;padding:0 14px;border-radius:999px;font-weight:700;font-size:14px;gap:8px}
 .chip[aria-pressed="true"]{background:var(--tint);border-color:var(--brand);color:var(--ink)}
 .banner{background:var(--tint);border-radius:0}
+.banner a{color:var(--brand);font-weight:800;white-space:nowrap}
 main{padding:14px 14px 110px;max-width:1080px}
 
 /* navigation */
@@ -576,6 +577,8 @@ const COLORS = {a:'var(--c-a)', b:'var(--c-b)', c:'var(--c-c)', all:'var(--c-all
 const STATUS = {todo:'À faire', doing:'En cours', done:'Fait'};
 const NEXT = {todo:'doing', doing:'done', done:'todo'};
 const COLS = ['tasks','ideas','events','points','weeks','pacts','jokers','spins','missions'];
+/* page publiée sur claude.ai : seule version où les données sont communes à toute la famille */
+const SHARED_URL = 'https://claude.ai/artifact/XyDceVrGTqUB2qQG4faGsM';
 
 function mergeSettings(d){
   const n = (d && d.names) || {};
@@ -1053,10 +1056,12 @@ function renderChrome(){
   const labels = {shared:'Partagé en direct', local:'Sur cet appareil seulement', connecting:'Connexion…', revoked:'Accès retiré'};
   s.textContent = labels[state.mode] || ''; s.dataset.m = state.mode === 'shared' ? 'shared' : state.mode === 'local' ? 'local' : 'wait';
   let msg = '';
-  if (state.mode === 'local') msg = 'Les données restent sur cet appareil et ne sont pas partagées. Le partage en direct fonctionne depuis le lien de la page publiée.';
+  let link = '';
+  if (state.mode === 'local') { msg = 'Ici, les données restent sur cet appareil : la famille ne les voit pas. Pour avoir les mêmes données que tout le monde, utilise la version familiale.'; link = SHARED_URL; }
   else if (state.mode === 'revoked') msg = 'Ton accès à cet espace a été retiré.';
-  else if (!state.canWrite) msg = 'Lecture seule : ton accès ne permet pas de modifier. Demande le niveau « Contributeur ».';
-  const b = $('#banner'); b.hidden = !msg; b.textContent = msg;
+  else if (!state.canWrite) msg = 'Lecture seule : ton accès ne permet pas de modifier. Demande au propriétaire de t\'inviter par e-mail avec le niveau « Éditeur ».';
+  const b = $('#banner'); b.hidden = !msg;
+  b.innerHTML = esc(msg) + (link ? ' <a href="' + esc(link) + '" target="_top" rel="noopener">Ouvrir la version familiale</a>' : '');
   $('#btnNewTask').disabled = !state.canWrite;
   $('#btnMe').innerHTML = avatar(meOf(), 40);
   VIEWS.forEach(v => { const el = $('#view-' + v); if (el) el.hidden = v !== ui.view; });
