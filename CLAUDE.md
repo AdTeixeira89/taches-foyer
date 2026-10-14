@@ -1,4 +1,4 @@
-# Mon Foyer : consignes pour Claude Code
+# Family Play : consignes pour Claude Code
 
 Application familiale (tâches, calendrier, points, défis, bonus, roulette) pour un couple et leur fille.
 Un seul fichier autonome : `index.html` (HTML, CSS et JavaScript, sans build ni dépendance), plus le logo (`logo.svg`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`) et `manifest.json`.

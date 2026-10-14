@@ -1,4 +1,4 @@
-# Mon Foyer
+# Family Play
 
 Application familiale : tâches, calendrier partagé, points, défis, bonus et roulette des récompenses.
 
@@ -14,7 +14,7 @@ Activation : Settings, Pages, Deploy from a branch, branche `main`, dossier `/ (
 
 Les données sont rangées dans une base Firebase (Firestore), comme pour app-sante. À faire une seule fois :
 
-1. Sur https://console.firebase.google.com, créer un projet (par exemple `mon-foyer`).
+1. Sur https://console.firebase.google.com, créer un projet (déjà créé : `taches-foyer`).
 2. **Build > Authentication > Get started**, puis activer le fournisseur **Anonyme**.
 3. **Build > Firestore Database > Create database** (région `europe-west`), puis onglet **Règles** : coller le contenu de `firestore.rules` et publier.
 4. **Paramètres du projet > Vos applications > Web (</>)** : enregistrer une application et copier l'objet `firebaseConfig`.
