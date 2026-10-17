@@ -1,0 +1,92 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const n = require('./notify');
+const nameOf = n.nameResolver({names: {a: 'Adao', b: 'Maman', c: 'Fille'}, members: [{id: 'mx1', name: 'Mamie'}]});
+
+test('prénoms : base, membres ajoutés, inconnu', () => {
+  assert.equal(nameOf('a'), 'Adao');
+  assert.equal(nameOf('mx1'), 'Mamie');
+  assert.equal(nameOf('zzz'), 'Quelqu’un');
+  assert.equal(n.nameResolver(null)('b'), 'Maman');
+});
+
+test('tâche confiée à quelqu\'un d\'autre : le destinataire est prévenu', () => {
+  const r = n.planTask(null, {title: 'Sortir les poubelles', owner: 'b', by: 'a', status: 'todo'}, nameOf);
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].to, ['b']);
+  assert.match(r[0].body, /Adao te confie « Sortir les poubelles »/);
+});
+test('tâche : rien si on se l\'attribue, si rien ne change, si terminée, sans auteur ou sans responsable', () => {
+  assert.equal(n.planTask(null, {title: 't', owner: 'a', by: 'a', status: 'todo'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'b', by: 'a', status: 'doing'}, nameOf).length, 0);
+  assert.equal(n.planTask(null, {title: 't', owner: 'b', by: 'a', status: 'done'}, nameOf).length, 0);
+  assert.equal(n.planTask(null, {title: 't', owner: 'b', status: 'todo'}, nameOf).length, 0);
+  assert.equal(n.planTask(null, {title: 't', owner: '', by: 'a', status: 'todo'}, nameOf).length, 0);
+});
+test('tâche reprise par un autre responsable : le nouveau est prévenu', () => {
+  const r = n.planTask({owner: 'a'}, {title: 'Vaisselle', owner: 'mx1', by: 'b', status: 'todo'}, nameOf);
+  assert.deepEqual(r[0].to, ['mx1']);
+});
+test('titre trop long raccourci', () => {
+  const r = n.planTask(null, {title: 'x'.repeat(300), owner: 'b', by: 'a', status: 'todo'}, nameOf);
+  assert.ok(r[0].body.length < 140);
+});
+
+test('joker échange : demande puis réponse', () => {
+  const j = {kind: 'swap', who: 'a', to: 'b', taskTitle: 'Linge', status: 'pending'};
+  const ask = n.planJoker(null, j, nameOf);
+  assert.deepEqual(ask[0].to, ['b']);
+  assert.match(ask[0].body, /Adao aimerait te passer « Linge »/);
+  const ok = n.planJoker(j, Object.assign({}, j, {status: 'accepted'}), nameOf);
+  assert.deepEqual(ok[0].to, ['a']);
+  assert.equal(ok[0].title, 'Échange accepté');
+  const no = n.planJoker(j, Object.assign({}, j, {status: 'refused'}), nameOf);
+  assert.deepEqual(no[0].to, ['a']);
+  assert.doesNotMatch(no[0].body, /refus/i);
+  assert.equal(n.planJoker(j, Object.assign({}, j, {status: 'cancelled'}), nameOf).length, 0);
+});
+test('joker aide : à une personne précise, ou à tous sauf le demandeur', () => {
+  const one = n.planJoker(null, {kind: 'help', who: 'a', want: 'c', taskTitle: 'Devoirs', status: 'open'}, nameOf);
+  assert.deepEqual(one[0].to, ['c']);
+  const any = n.planJoker(null, {kind: 'help', who: 'a', want: '', taskTitle: 'Devoirs', status: 'open'}, nameOf);
+  assert.equal(any[0].to, 'all');
+  assert.equal(any[0].except, 'a');
+  const got = n.planJoker({kind: 'help', who: 'a', status: 'open'}, {kind: 'help', who: 'a', taskTitle: 'Devoirs', status: 'accepted', helper: 'mx1'}, nameOf);
+  assert.deepEqual(got[0].to, ['a']);
+  assert.match(got[0].title, /Mamie/);
+});
+test('joker choix : aucune notification', () => {
+  assert.equal(n.planJoker(null, {kind: 'choice', who: 'a', status: 'active'}, nameOf).length, 0);
+});
+
+test('événement : pour toute la famille (sauf l\'auteur) ou pour une personne', () => {
+  const all = n.planEvent(null, {title: 'Anniversaire', date: '2026-10-22', time: '18:30', who: 'all', by: 'a'}, nameOf);
+  assert.equal(all[0].to, 'all');
+  assert.equal(all[0].except, 'a');
+  assert.match(all[0].body, /Anniversaire · jeudi 22 octobre à 18:30/);
+  const one = n.planEvent(null, {title: 'Dentiste', date: '2026-10-23', who: 'c', by: 'a'}, nameOf);
+  assert.deepEqual(one[0].to, ['c']);
+  assert.equal(n.planEvent(null, {title: 'Moi', date: '2026-10-23', who: 'a', by: 'a'}, nameOf).length, 0);
+  assert.equal(n.planEvent({title: 'x'}, {title: 'x', who: 'all'}, nameOf).length, 0);
+});
+test('date invalide : pas de date dans le message', () => {
+  assert.equal(n.dateLabel('n’importe quoi'), '');
+  const r = n.planEvent(null, {title: 'Truc', date: '', who: 'all', by: 'a'}, nameOf);
+  assert.equal(r[0].body, 'Truc');
+});
+
+test('champion de la semaine : toute la famille, égalité incluse', () => {
+  const r = n.planWeek(null, {champions: ['a', 'mx1'], max: 12}, nameOf);
+  assert.equal(r[0].to, 'all');
+  assert.match(r[0].body, /Adao et Mamie \(12 pts\)/);
+  assert.equal(n.planWeek(null, {champions: [], max: 0}, nameOf).length, 0);
+  assert.equal(n.planWeek({champions: ['a']}, {champions: ['a']}, nameOf).length, 0);
+});
+
+test('appareils visés', () => {
+  const devices = [{token: 't1', who: 'a'}, {token: 't2', who: 'b'}, {token: 't3', who: 'a'}, {token: '', who: 'b'}, null];
+  assert.deepEqual(n.pickDevices(devices, {to: ['b']}).map(d => d.token), ['t2']);
+  assert.deepEqual(n.pickDevices(devices, {to: 'all', except: 'a'}).map(d => d.token), ['t2']);
+  assert.deepEqual(n.pickDevices(devices, {to: 'all', except: ''}).map(d => d.token), ['t1', 't2', 't3']);
+});

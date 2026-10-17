@@ -9,5 +9,19 @@ service cloud.firestore {
         && code.matches('^[A-Z0-9]{12}$')
         && col in ['tasks', 'ideas', 'events', 'points', 'weeks', 'pacts', 'jokers', 'spins', 'missions', 'settings'];
     }
+
+    // Notifications push : chaque téléphone y enregistre son jeton (écriture seule, jamais de
+    // lecture ni de liste côté application). Seules les Cloud Functions les lisent pour envoyer.
+    match /foyers/{code}/devices/{id} {
+      allow create, update: if request.auth != null
+        && code.matches('^[A-Z0-9]{12}$')
+        && request.resource.data.keys().hasOnly(['token', 'who', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() < 1000
+        && request.resource.data.who is string
+        && request.resource.data.who.size() < 20;
+      allow delete: if request.auth != null
+        && code.matches('^[A-Z0-9]{12}$');
+    }
   }
 }
