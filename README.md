@@ -10,6 +10,10 @@ Une seule page HTML autonome (`index.html`), sans installation. Le logo (`logo.s
 
 Activation : Settings, Pages, Deploy from a branch, branche `main`, dossier `/ (root)`.
 
+## Ajouter des membres
+
+Au départ, la famille compte trois profils (Adao, Maman, Fille). Pour en ajouter (grands-parents, cousins, autre enfant…) : **Famille > + Ajouter un membre**, ou **Paramètres > Autres membres**, ou dans « Qui utilise cet appareil ? ». Chaque membre a son prénom, son avatar et sa couleur, et joue comme les autres : colonne de tâches, points, classement, jokers et un tour de roulette par semaine. Jusqu'à 8 membres au total. Décocher « Afficher ce membre » le masque sans rien effacer (ses points et son historique restent).
+
 ## Avoir les mêmes données pour toute la famille (lien GitHub)
 
 Les données sont rangées dans une base Firebase (Firestore), comme pour app-sante. À faire une seule fois :

@@ -234,6 +234,7 @@ textarea{min-height:90px;resize:vertical}
   --bg:#f6f5fd;--surface:#ffffff;--ink:#1e1b3a;--muted:#6b6a86;--line:#e8e6f5;
   --brand:#6c4cf1;--primary:#6c4cf1;--on-primary:#ffffff;--tint:#efecff;
   --c-a:#3d7bff;--c-b:#ff6f61;--c-c:#18bfae;--c-all:#8b86a8;
+  --c-d:#f2a31b;--c-e:#d64fc0;--c-f:#7fb82a;--c-g:#18a9d6;--c-h:#a9774d;
   --gold:#ffc83d;--done:#a9a6c0;--late:#d9482b;--scrim:rgba(20,15,50,.45);
   --grad:linear-gradient(135deg,#6c4cf1 0%,#3d7bff 100%);
   --shadow:0 6px 18px rgba(70,50,150,.10);
@@ -244,6 +245,7 @@ textarea{min-height:90px;resize:vertical}
     --bg:#14122a;--surface:#1f1c3b;--ink:#f1efff;--muted:#a9a6cc;--line:#302c58;
     --brand:#9a85ff;--primary:#9a85ff;--on-primary:#120c2e;--tint:#2a2554;
     --c-a:#6a9bff;--c-b:#ff8a7c;--c-c:#3fd6c4;--c-all:#a29dc4;
+    --c-d:#ffbe55;--c-e:#ee83d8;--c-f:#a2d84e;--c-g:#55cdf0;--c-h:#cc9f78;
     --done:#6f6a99;--late:#ff8d6e;--scrim:rgba(0,0,0,.6);
     --grad:linear-gradient(135deg,#7a5cff 0%,#3d7bff 100%);--shadow:0 6px 18px rgba(0,0,0,.35);
   }
@@ -252,6 +254,7 @@ textarea{min-height:90px;resize:vertical}
   --bg:#14122a;--surface:#1f1c3b;--ink:#f1efff;--muted:#a9a6cc;--line:#302c58;
   --brand:#9a85ff;--primary:#9a85ff;--on-primary:#120c2e;--tint:#2a2554;
   --c-a:#6a9bff;--c-b:#ff8a7c;--c-c:#3fd6c4;--c-all:#a29dc4;
+    --c-d:#ffbe55;--c-e:#ee83d8;--c-f:#a2d84e;--c-g:#55cdf0;--c-h:#cc9f78;
   --done:#6f6a99;--late:#ff8d6e;--scrim:rgba(0,0,0,.6);
   --grad:linear-gradient(135deg,#7a5cff 0%,#3d7bff 100%);--shadow:0 6px 18px rgba(0,0,0,.35);
 }
@@ -377,7 +380,7 @@ main{padding:14px 14px 110px;max-width:1080px}
 .tile b{font-size:22px;line-height:1;font-weight:800}
 .tile span{font-size:12px;color:var(--muted);font-weight:700}
 .tile.t-wheel{background:linear-gradient(135deg,color-mix(in srgb,var(--c-b) 22%,var(--surface)),color-mix(in srgb,var(--gold) 26%,var(--surface)))}
-.mini-lb{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-bottom:6px}
+.mini-lb{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:8px;text-align:center;margin-bottom:6px}
 .mini-lb div{display:flex;flex-direction:column;align-items:center;gap:2px}
 .mini-lb b{font-size:20px;font-weight:800;color:var(--pc)}
 .mini-lb span{font-size:12px;color:var(--muted);font-weight:700}
@@ -460,6 +463,10 @@ input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;m
 .upnext{border-radius:18px}
 .seg-top{border-radius:14px}
 @media (prefers-reduced-motion: reduce){.result .burst{animation:none}.xpbar b,.prog b,.lb-bar b{transition:none}}
+
+/* membres supplémentaires */
+.mrow{padding:12px 12px 2px;border:1px solid var(--line);border-left:5px solid var(--pc,var(--c-all));border-radius:16px;margin-bottom:12px;background:color-mix(in srgb,var(--tint) 40%,transparent)}
+.mrow .dot{margin-right:4px}
 
 /* finitions */
 .brand{min-width:0}
@@ -553,7 +560,11 @@ ui.fx = Object.assign({anim:true, sound:false}, ui.fx || {}); ui.celebrated = ui
 function savePrefs(){ try { localStorage.setItem(PREF_KEY, JSON.stringify(ui)); } catch(e) {} }
 
 /* ---------- état ---------- */
-const PEOPLE = ['a','b','c'];
+const BASE_PEOPLE = ['a','b','c'];
+// membres ajoutés par la famille : jusqu'à 5, chacun avec sa couleur (settings/family.members)
+const EXTRA_COLORS = ['--c-d','--c-e','--c-f','--c-g','--c-h'];
+const MAX_EXTRA = EXTRA_COLORS.length;
+const DEFAULT_EXTRA_AVATARS = ['bear','cat','panda','fox','owl'];
 const COLORS = {a:'var(--c-a)', b:'var(--c-b)', c:'var(--c-c)', all:'var(--c-all)'};
 const STATUS = {todo:'À faire', doing:'En cours', done:'Fait'};
 const NEXT = {todo:'doing', doing:'done', done:'todo'};
@@ -564,13 +575,23 @@ const SHARED_URL = 'https://claude.ai/artifact/XyDceVrGTqUB2qQG4faGsM';
 
 function mergeSettings(d){
   const n = (d && d.names) || {};
-  return {
+  // membres supplémentaires (facultatif : les anciens réglages n'en ont pas)
+  const members = (d && Array.isArray(d.members) ? d.members : []).filter(m => m && /^m[a-z0-9]{2,16}$/.test(String(m.id))).slice(0, MAX_EXTRA).map((m, i) => ({
+    id: String(m.id),
+    name: String(m.name || '').trim().slice(0, 24) || 'Membre ' + (i + 1),
+    avatar: /^(fox|cat|owl|bear|rabbit|panda)$/.test(m.avatar) ? m.avatar : DEFAULT_EXTRA_AVATARS[i % DEFAULT_EXTRA_AVATARS.length],
+    on: m.on !== false
+  }));
+  const s = {
     names: {a: n.a || 'Adao', b: n.b || 'Maman', c: n.c || 'Fille'},
     daughterOn: d && typeof d.daughterOn === 'boolean' ? d.daughterOn : true,
     goal: d && Number(d.goal) > 0 ? Number(d.goal) : 20,
     collReward: (d && d.collReward) || 'Soirée pizza',
-    avatars: {a: (d && d.avatars && d.avatars.a) || 'fox', b: (d && d.avatars && d.avatars.b) || 'owl', c: (d && d.avatars && d.avatars.c) || 'rabbit'}
+    avatars: {a: (d && d.avatars && d.avatars.a) || 'fox', b: (d && d.avatars && d.avatars.b) || 'owl', c: (d && d.avatars && d.avatars.c) || 'rabbit'},
+    members: members
   };
+  members.forEach(m => { s.names[m.id] = m.name; s.avatars[m.id] = m.avatar; });
+  return s;
 }
 const state = {
   tasks:[], ideas:[], events:[], points:[], weeks:[], pacts:[], jokers:[], spins:[], missions:[],
@@ -579,9 +600,17 @@ const state = {
 };
 const cal = {anchor:new Date(), sel:todayStr(), showPast:false};
 
+// une couleur par membre supplémentaire, dans l'ordre de la liste (jamais réattribuée)
+function syncColors(){
+  Object.keys(COLORS).forEach(k => { if (BASE_PEOPLE.indexOf(k) < 0 && k !== 'all') delete COLORS[k]; });
+  state.settings.members.forEach((m, i) => { COLORS[m.id] = 'var(' + EXTRA_COLORS[i] + ')'; });
+}
+function applySettings(raw){ state.settings = mergeSettings(raw); syncColors(); }
+
 const pname = k => k === 'all' ? 'Toute la famille' : (state.settings.names[k] || '');
 const initial = k => (pname(k).trim()[0] || '?').toUpperCase();
-const activePeople = () => state.settings.daughterOn ? PEOPLE.slice() : ['a','b'];
+const everyone = () => BASE_PEOPLE.concat(state.settings.members.map(m => m.id));
+const activePeople = () => (state.settings.daughterOn ? BASE_PEOPLE.slice() : ['a','b']).concat(state.settings.members.filter(m => m.on).map(m => m.id));
 
 /* ---------- base familiale hors claude.ai (GitHub Pages) : Firebase ---------- */
 // Configuration web du projet Firebase (console Firebase > Paramètres du projet > Vos applications).
@@ -667,7 +696,7 @@ const store = {
     } else {
       state.mode = 'local';
       COLS.forEach(c => { try { state[c] = JSON.parse(localStorage.getItem('famille.local.' + c) || '[]'); } catch(e) { state[c] = []; } state.loaded[c] = true; });
-      try { state.settings = mergeSettings(JSON.parse(localStorage.getItem('famille.local.settings') || 'null')); } catch(e) {}
+      try { applySettings(JSON.parse(localStorage.getItem('famille.local.settings') || 'null')); } catch(e) {}
     }
     renderAll();
     if (!ui.meSet) setTimeout(() => { if (!sheet) profileSheet(); }, 500);
@@ -681,7 +710,7 @@ const store = {
       }, onDbError);
     });
     db.doc('settings/family').onSnapshot(snap => {
-      state.settings = mergeSettings(snap.exists ? snap.data() : null);
+      applySettings(snap.exists ? snap.data() : null);
       renderAll();
     }, onDbError);
   },
@@ -717,7 +746,7 @@ const store = {
   },
   async saveSettings(s){
     if (this.db) return this.db.doc('settings/family').set(s);
-    state.settings = mergeSettings(s);
+    applySettings(s);
     try { localStorage.setItem('famille.local.settings', JSON.stringify(s)); } catch(e) {}
     renderAll();
   }
@@ -900,7 +929,7 @@ function renderTasks(){
     ? '<div class="pool"><h3>' + IC.hand(18) + 'À prendre (' + pool.length + ')</h3><p class="muted" style="margin:0 0 6px">Touche un avatar pour prendre la tâche.</p><ul class="list">' + pool.map(t => taskCard(t, true)).join('') + '</ul></div>' : '';
 
   const cols = $('#cols');
-  cols.style.setProperty('--n', Math.max(vis.length, 1));
+  cols.style.setProperty('--n', Math.min(Math.max(vis.length, 1), 4));
   if (!vis.length) { cols.innerHTML = '<p class="empty">Aucune colonne affichée. Touche un prénom ci-dessus pour la montrer.</p>'; return; }
   cols.innerHTML = vis.map(p => {
     const mine = list.filter(t => t.owner === p);
@@ -1007,13 +1036,35 @@ function groupByDate(evs){
 }
 
 /* ---------- réglages ---------- */
-function settingsSheet(){
+const memberColor = i => 'var(' + EXTRA_COLORS[i] + ')';
+function memberRowHtml(m, i){
+  const id = esc(m.id), col = memberColor(i);
+  const swatches = AVATARS.map(a => '<label class="opt"><input type="radio" name="mav_' + id + '" value="' + a + '"' + (m.avatar === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(m.id, 48, a, col) + '</span></label>').join('');
+  return '<div class="mrow" data-id="' + id + '" style="--pc:' + col + '">' +
+    '<label class="fld"><span><i class="dot" style="--pc:' + col + '"></i>Prénom du membre</span><input type="text" name="mn_' + id + '" maxlength="24" autocomplete="off" value="' + esc(m.name) + '" placeholder="Ex. Papi"></label>' +
+    '<div class="fld"><span class="lab">Avatar</span><div class="seg">' + swatches + '</div></div>' +
+    '<label class="check"><input type="checkbox" name="mon_' + id + '"' + (m.on ? ' checked' : '') + '><span>Afficher ce membre (décoché : masqué, l’historique reste)</span></label></div>';
+}
+function addMemberRow(){
+  const box = $('#memberRows');
+  if (!box) return;
+  const n = $$('.mrow', box).length;
+  if (n >= MAX_EXTRA) { toast('Maximum atteint : ' + (BASE_PEOPLE.length + MAX_EXTRA) + ' membres.'); return; }
+  const m = {id: 'm' + uid(), name: '', avatar: DEFAULT_EXTRA_AVATARS[n % DEFAULT_EXTRA_AVATARS.length], on: true};
+  box.insertAdjacentHTML('beforeend', memberRowHtml(m, n));
+  const last = $$('.mrow input[type=text]', box).pop();
+  if (last) last.focus();
+}
+function settingsSheet(addNew){
   const s = state.settings;
   const body =
-    '<p class="help">Les prénoms et la colonne de ta fille sont partagés avec toute la famille.</p>' +
+    '<p class="help">Les prénoms, les membres et la colonne de ta fille sont partagés avec toute la famille.</p>' +
     ['a','b','c'].map(k => '<label class="fld"><span>' + (k === 'a' ? 'Premier prénom' : k === 'b' ? 'Deuxième prénom' : 'Troisième prénom') + '</span><input type="text" name="n_' + k + '" maxlength="24" autocomplete="off" value="' + esc(s.names[k]) + '"></label>').join('') +
-    activePeople().map(p => '<div class="fld"><span class="lab">Avatar de ' + esc(pname(p)) + '</span><div class="seg">' + AVATARS.map(a => '<label class="opt"><input type="radio" name="av_' + p + '" value="' + a + '"' + (s.avatars[p] === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(p, 48, a) + '</span></label>').join('') + '</div></div>').join('') +
+    activePeople().filter(p => BASE_PEOPLE.indexOf(p) >= 0).map(p => '<div class="fld"><span class="lab">Avatar de ' + esc(pname(p)) + '</span><div class="seg">' + AVATARS.map(a => '<label class="opt"><input type="radio" name="av_' + p + '" value="' + a + '"' + (s.avatars[p] === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(p, 48, a) + '</span></label>').join('') + '</div></div>').join('') +
     '<label class="check"><input type="checkbox" name="daughterOn"' + (s.daughterOn ? ' checked' : '') + '><span>Utiliser la colonne de ma fille</span></label>' +
+    '<p class="sub">Autres membres de la famille</p>' +
+    '<div id="memberRows">' + s.members.map((m, i) => memberRowHtml(m, i)).join('') + '</div>' +
+    '<p style="margin:0 0 12px"><button type="button" class="btn small" data-action="addMemberRow">+ Ajouter un membre</button></p>' +
     '<label class="fld" style="margin-top:10px"><span>Défi de la famille : tâches à terminer par semaine</span><input type="text" inputmode="numeric" name="goal" maxlength="2" value="' + esc(s.goal) + '"></label>' +
     '<label class="fld"><span>Récompense du défi</span><input type="text" name="collReward" maxlength="60" autocomplete="off" value="' + esc(s.collReward) + '"></label>' +
     '<div class="seg" style="margin:-6px 0 14px">' + ['Soirée pizza', 'Jeu de société', 'Sortie familiale'].map(r => '<button type="button" class="chip" data-action="rewardPreset" data-t="' + r + '">' + r + '</button>').join('') + '</div>' +
@@ -1030,9 +1081,11 @@ function settingsSheet(){
     const names = {a: val(f,'n_a') || 'Adao', b: val(f,'n_b') || 'Maman', c: val(f,'n_c') || 'Fille'};
     ui.fx = {anim: f.elements.animOn.checked, sound: f.elements.soundOn.checked}; savePrefs();
     const goalV = Math.min(99, Math.max(1, parseInt(val(f, 'goal'), 10) || 20));
-    const avatars = {}; PEOPLE.forEach(p => { avatars[p] = radio(f, 'av_' + p) || state.settings.avatars[p]; });
-    return run(() => store.saveSettings({names, daughterOn: f.elements.daughterOn.checked, goal: goalV, collReward: val(f, 'collReward') || 'Soirée pizza', avatars}));
+    const avatars = {}; BASE_PEOPLE.forEach(p => { avatars[p] = radio(f, 'av_' + p) || state.settings.avatars[p]; });
+    const members = $$('.mrow', f).map((row, i) => { const id = row.dataset.id; return {id, name: val(f, 'mn_' + id) || 'Membre ' + (i + 1), avatar: radio(f, 'mav_' + id) || DEFAULT_EXTRA_AVATARS[i % DEFAULT_EXTRA_AVATARS.length], on: f.elements['mon_' + id].checked}; });
+    return run(() => store.saveSettings({names, daughterOn: f.elements.daughterOn.checked, goal: goalV, collReward: val(f, 'collReward') || 'Soirée pizza', avatars, members}));
   });
+  if (addNew) addMemberRow();
 }
 
 /* ---------- rendu global ---------- */
@@ -1077,11 +1130,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const ptsOf = t => Number(t.pts) || 2;
 
 function totalsOf(wk){
-  const t = {a:0, b:0, c:0};
+  const t = {};
+  everyone().forEach(p => { t[p] = 0; });
   state.points.forEach(p => { if (p.week === wk && t[p.who] !== undefined) t[p.who] += Number(p.pts) || 0; });
   return t;
 }
-function peopleFor(wk){ const t = totalsOf(wk); return PEOPLE.filter(p => activePeople().indexOf(p) >= 0 || t[p] > 0); }
+function peopleFor(wk){ const t = totalsOf(wk); return everyone().filter(p => activePeople().indexOf(p) >= 0 || t[p] > 0); }
 function championOf(wk){
   const t = totalsOf(wk), ppl = peopleFor(wk);
   const max = Math.max.apply(null, [0].concat(ppl.map(p => t[p])));
@@ -1268,7 +1322,7 @@ function finalizeWeeks(){
 function celebrateChampion(wk){
   const c = championOf(wk);
   if (!c.list.length) return;
-  const total = PEOPLE.reduce((s, p) => s + c.t[p], 0);
+  const total = everyone().reduce((s, p) => s + (c.t[p] || 0), 0);
   const msg = c.list.length > 1 ? 'Égalité parfaite : le trophée se partage !' :
     pick(['Le trophée est à toi, la maison applaudit.', 'Champion de la semaine : le lave-vaisselle tremble encore.', 'Bravo ! Les autres ont déjà commencé l’ovation.']);
   openSheet('Champion de la semaine',
@@ -1410,10 +1464,10 @@ const FACES = {
   rabbit: '<ellipse cx="17" cy="11" rx="4" ry="9" fill="#fff"/><ellipse cx="31" cy="11" rx="4" ry="9" fill="#fff"/><ellipse cx="17" cy="11" rx="2" ry="6.5" fill="#ffb3c1"/><ellipse cx="31" cy="11" rx="2" ry="6.5" fill="#ffb3c1"/><ellipse cx="24" cy="30" rx="13.5" ry="12" fill="#fff"/><circle cx="18.5" cy="28" r="1.9" fill="#2b2140"/><circle cx="29.5" cy="28" r="1.9" fill="#2b2140"/><ellipse cx="24" cy="33" rx="2" ry="1.5" fill="#ff8fa3"/>',
   panda: '<circle cx="11.5" cy="13" r="5.5" fill="#2b2140"/><circle cx="36.5" cy="13" r="5.5" fill="#2b2140"/><circle cx="24" cy="28" r="14" fill="#fff"/><ellipse cx="17.5" cy="26" rx="4" ry="5" fill="#2b2140" transform="rotate(-20 17.5 26)"/><ellipse cx="30.5" cy="26" rx="4" ry="5" fill="#2b2140" transform="rotate(20 30.5 26)"/><circle cx="17.5" cy="26" r="1.3" fill="#fff"/><circle cx="30.5" cy="26" r="1.3" fill="#fff"/><ellipse cx="24" cy="33" rx="2.2" ry="1.6" fill="#2b2140"/>'
 };
-function avatar(who, size, kind){
+function avatar(who, size, kind, color){
   const s = size || 40;
   const k = kind || (state.settings.avatars && state.settings.avatars[who]) || 'fox';
-  return '<span class="av" style="--pc:' + (COLORS[who] || COLORS.all) + ';width:' + s + 'px;height:' + s + 'px"><svg viewBox="5 6 38 38" aria-hidden="true"><circle cx="24" cy="24" r="24" style="fill:var(--pc)"/>' + (FACES[k] || FACES.fox) + '</svg></span>';
+  return '<span class="av" style="--pc:' + (color || COLORS[who] || COLORS.all) + ';width:' + s + 'px;height:' + s + 'px"><svg viewBox="5 6 38 38" aria-hidden="true"><circle cx="24" cy="24" r="24" style="fill:var(--pc)"/>' + (FACES[k] || FACES.fox) + '</svg></span>';
 }
 
 const LEVEL_STEP = 20;
@@ -1539,7 +1593,8 @@ function familySheet(){
 function profileSheet(){
   openSheet('Qui utilise cet appareil ?',
     '<p class="help">Ton profil sert à t’accueillir, à suivre tes points et à valider les accords (échanges de corvées). Tu peux en changer à tout moment avec ton avatar en haut.</p>' +
-    '<div class="menu-grid">' + activePeople().map(p => '<button type="button" class="menu-i' + (p === meOf() ? ' on' : '') + '" data-action="setMe" data-p="' + p + '">' + avatar(p, 68) + '<span>' + esc(pname(p)) + '</span></button>').join('') + '</div>', async () => true);
+    '<div class="menu-grid">' + activePeople().map(p => '<button type="button" class="menu-i' + (p === meOf() ? ' on' : '') + '" data-action="setMe" data-p="' + p + '">' + avatar(p, 68) + '<span>' + esc(pname(p)) + '</span></button>').join('') + '</div>' +
+    '<p class="center" style="margin:14px 0 0"><button type="button" class="link" data-action="addMember">+ Ajouter un membre</button></p>', async () => true);
 }
 
 /* ===== petites briques communes ===== */
@@ -1579,7 +1634,7 @@ function missionCard(){
   return '<section class="card"><header class="card-h">' + IC.hand(20) + '<h2>Petite mission du jour</h2><span class="muted">facultatif</span></header><p class="big">' + esc(MISSIONS[mi]()) + '</p>' +
     '<div class="fun-actions">' + (doneBy[me] !== undefined ? '<span class="pill okp">Fait, merci !</span>' : '<button type="button" class="btn primary" data-action="missionDone">C’est fait</button>') +
     '<button type="button" class="btn quiet" data-action="missionShuffle">Une autre</button></div>' +
-    (Object.keys(doneBy).length ? '<p class="muted" style="margin-top:8px">Faite par ' + esc(namesOf(Object.keys(doneBy).filter(k => PEOPLE.indexOf(k) >= 0))) + '</p>' : '') + '</section>';
+    (Object.keys(doneBy).length ? '<p class="muted" style="margin-top:8px">Faite par ' + esc(namesOf(Object.keys(doneBy).filter(k => everyone().indexOf(k) >= 0))) + '</p>' : '') + '</section>';
 }
 function badgesCard(who){
   const bd = badgesOf(who), st = curStreak(who);
@@ -1764,7 +1819,8 @@ function renderFamily(){
       '<div class="mini-badges">' + BADGES.map(b => '<span class="mb' + (bd[b.id] ? ' on' : '') + '" title="' + esc(b.name) + '">' + IC[b.icon](16) + '</span>').join('') + '</div>' +
       (recent.length ? '<p class="muted" style="margin:6px 0 0">Récemment : ' + recent.map(r => esc(r.title)).join(', ') + '</p>' : '') + '</div></article>';
   }).join('');
-  $('#familybody').innerHTML = leaderCard() + '<div class="pgrid">' + cards + '</div>' + collectiveCard();
+  $('#familybody').innerHTML = leaderCard() + '<div class="pgrid">' + cards + '</div>' +
+    '<p class="center"><button type="button" class="btn small" data-action="addMember">+ Ajouter un membre</button></p>' + collectiveCard();
 }
 
 /* ===== historique ===== */
@@ -1805,6 +1861,8 @@ document.addEventListener('click', ev => {
     case 'statusFilter': ui.status = el.dataset.s; savePrefs(); renderTasks(); break;
     case 'toggleDone': ui.hideDone = !ui.hideDone; savePrefs(); renderTasks(); break;
     case 'settings': if (state.canWrite) settingsSheet(); else if (state.mode === 'nofamily') familySheet(); else toast('Lecture seule.'); break;
+    case 'addMember': if (state.canWrite) settingsSheet(true); else if (state.mode === 'nofamily') familySheet(); else toast('Lecture seule.'); break;
+    case 'addMemberRow': addMemberRow(); break;
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
     case 'closeSheet': closeSheet(); break;
     case 'family': if (store.backend === 'firebase') familySheet(); break;
