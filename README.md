@@ -31,6 +31,26 @@ Le code du foyer sert de clé : ne le donner qu'à la famille. Les tâches saisi
 
 Tant que `FIREBASE_CONFIG` vaut `null`, le lien GitHub fonctionne en mode local : les données restent sur chaque appareil.
 
+## Notifications push (même application fermée)
+
+Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'autre, un échange de joker ou une demande d'aide le concerne (et la réponse), un événement du calendrier est créé pour lui ou pour toute la famille, ou la semaine a un champion. Celui qui agit n'est jamais notifié de sa propre action. Elles suivent le profil choisi sur l'appareil. Elles n'existent que sur le lien GitHub (mode Firebase), pas sur la page claude.ai.
+
+À faire une seule fois :
+
+1. **Forfait Blaze** : console Firebase, roue dentée, *Utilisation et facturation*, *Modifier le forfait*, Blaze (carte bancaire demandée par Google). L'usage d'une famille reste dans les quotas gratuits. Ajoute une alerte de budget (par exemple 1 €).
+2. **Clé Web Push** : faite. La clé publique du projet est déjà dans `index.html` (`FCM_VAPID_KEY`). Pour la changer : *Paramètres du projet*, onglet *Cloud Messaging*, section *Configuration Web*, *Générer une paire de clés*.
+3. **Déployer les fonctions** depuis Google Cloud Shell (https://shell.cloud.google.com, avec le compte Google du projet) :
+   ```
+   git clone https://github.com/AdTeixeira89/taches-foyer.git && cd taches-foyer
+   npm --prefix functions install
+   npx firebase-tools login --no-localhost
+   npx firebase-tools deploy --only functions,firestore:rules --project taches-foyer
+   ```
+   Accepte l'activation des services Google proposés au premier déploiement. Si le déploiement signale que la région ne correspond pas à celle de Firestore, change `REGION` dans `functions/index.js`.
+4. **Sur chaque téléphone** : ouvre le lien, *Paramètres*, *Activer les notifications*. Sur iPhone (iOS 16.4 ou plus), ajoute d'abord l'application à l'écran d'accueil (Partager, *Sur l'écran d'accueil*) et active les notifications depuis son icône.
+
+Les tests du code d'envoi se lancent avec `cd functions && npm install && npm test`. Les règles de `firestore.rules` doivent être publiées (étape 3) : les jetons des téléphones sont enregistrés sous `foyers/<code>/devices`, sans lecture possible depuis l'application.
+
 ## Version claude.ai
 
 La même page est publiée sur claude.ai : https://claude.ai/artifact/XyDceVrGTqUB2qQG4faGsM. Elle utilise la base intégrée à claude.ai (indépendante de Firebase). Pour la partager, inviter chaque membre par e-mail avec le niveau **Éditeur**, sans lien public.

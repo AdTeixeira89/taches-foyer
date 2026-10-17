@@ -623,6 +623,11 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "391719656519",
   appId: "1:391719656519:web:d5d2cec57ed372447f2562"
 };
+// Notifications push : clé publique « Web Push » du projet (console Firebase > Paramètres du projet > Cloud Messaging).
+// Tant qu'elle vaut null, aucune option de notification n'est proposée.
+const FCM_VAPID_KEY = 'BEVVmxuWvE_ItpfbKbPbQsJN5BweDvWj-zhqNGk5xK_X3Qtnvd8tEg-K1grBpd0PzaN0fT0SlJYMFhiUar9dNtc';
+const NOTIF_KEY = 'famille.notif.on';
+const DEVICE_KEY = 'famille.device.id';
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const FAMILY_KEY = 'famille.firebase.code';
 const NEW_FAMILY_KEY = 'famille.firebase.new';
@@ -641,7 +646,7 @@ function firebaseBase(){
     const auth = authM.getAuth(app);
     await auth.authStateReady();
     if (!auth.currentUser) await authM.signInAnonymously(auth);
-    return {fsM, fs: fsM.initializeFirestore(app, {ignoreUndefinedProperties: true})};
+    return {fsM, app, fs: fsM.initializeFirestore(app, {ignoreUndefinedProperties: true})};
   })();
   return fbBase;
 }
@@ -664,6 +669,82 @@ async function firebaseDb(code){
     doc: path => docApi(fsM.doc(fs, 'foyers', code, ...path.split('/')))
   };
 }
+
+/* ---------- notifications push (Firebase Cloud Messaging) ---------- */
+// Chaque téléphone enregistre son jeton sous foyers/<code>/devices avec le profil choisi sur l'appareil.
+// Les Cloud Functions (dossier functions/) envoient ensuite les notifications, même application fermée.
+const push = {
+  listening: false,
+  configured(){ return store.backend === 'firebase' && !!FCM_VAPID_KEY; },
+  supported(){ return this.configured() && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window; },
+  on(){ try { return this.supported() && localStorage.getItem(NOTIF_KEY) === '1' && Notification.permission === 'granted'; } catch(e) { return false; } },
+  deviceId(){
+    let id = '';
+    try { id = localStorage.getItem(DEVICE_KEY) || ''; if (!id) { id = 'd' + uid(); localStorage.setItem(DEVICE_KEY, id); } } catch(e) {}
+    return id || 'd' + uid();
+  },
+  async messaging(){
+    const {app} = await firebaseBase();
+    const m = await import(FB_SDK + 'firebase-messaging.js');
+    if (!(await m.isSupported())) throw new Error('Notifications non gérées par ce navigateur');
+    return {m, messaging: m.getMessaging(app)};
+  },
+  async token(){
+    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    await navigator.serviceWorker.ready;
+    const {m, messaging} = await this.messaging();
+    const token = await m.getToken(messaging, {vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg});
+    if (!token) throw new Error('Jeton de notification indisponible');
+    if (!this.listening) {  // application ouverte : on affiche un message dans l'app (le navigateur n'en affiche pas)
+      this.listening = true;
+      m.onMessage(messaging, p => { const n = p.notification || {}; toast((n.title ? n.title + ' : ' : '') + (n.body || '')); });
+    }
+    return token;
+  },
+  async save(token){
+    const {fsM, fs} = await firebaseBase();
+    await fsM.setDoc(fsM.doc(fs, 'foyers', getFamilyCode(), 'devices', this.deviceId()), {token, who: meOf(), updatedAt: Date.now()});
+  },
+  async enable(){
+    if (!this.supported()) return false;
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await Notification.requestPermission();  // doit suivre directement un appui de l'utilisateur
+    if (perm !== 'granted') { toast(perm === 'denied' ? 'Notifications bloquées : autorise-les dans les réglages du navigateur.' : 'Notifications non activées.'); return false; }
+    try { await this.save(await this.token()); localStorage.setItem(NOTIF_KEY, '1'); return true; }
+    catch(e) { console.error(e); toast('Impossible d’activer les notifications sur cet appareil.'); return false; }
+  },
+  async disable(){
+    try { localStorage.removeItem(NOTIF_KEY); } catch(e) {}
+    try {
+      const {fsM, fs} = await firebaseBase();
+      await fsM.deleteDoc(fsM.doc(fs, 'foyers', getFamilyCode(), 'devices', this.deviceId()));
+      const {m, messaging} = await this.messaging(); await m.deleteToken(messaging);
+    } catch(e) { console.error(e); }
+  },
+  // au lancement : on rafraîchit le jeton (il peut changer) ; après un changement de profil : on met à jour « qui »
+  async resume(){ if (this.on()) { try { await this.save(await this.token()); } catch(e) { console.error(e); } } },
+  async setWho(){
+    if (!this.on()) return;
+    try { const {fsM, fs} = await firebaseBase(); await fsM.updateDoc(fsM.doc(fs, 'foyers', getFamilyCode(), 'devices', this.deviceId()), {who: meOf(), updatedAt: Date.now()}); }
+    catch(e) { console.error(e); }
+  }
+};
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isInstalled = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+function notifBoxHtml(){
+  if (!push.supported()) {
+    return '<p class="help">' + (isIOS() && !isInstalled()
+      ? 'Sur iPhone : ajoute d’abord l’application à l’écran d’accueil (Partager, puis « Sur l’écran d’accueil »), ouvre-la depuis son icône, puis active les notifications ici.'
+      : 'Ce navigateur ne permet pas les notifications.') + '</p>';
+  }
+  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+    return '<p class="help">Les notifications sont bloquées pour ce site. Autorise-les dans les réglages du navigateur, puis reviens ici.</p>';
+  }
+  return push.on()
+    ? '<p class="help"><b>Notifications activées</b> pour ' + esc(pname(meOf())) + ' (le profil de cet appareil).</p><button type="button" class="btn small" data-action="notifOff">Désactiver</button>'
+    : '<p class="help">Reçois une notification quand une tâche t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
+}
+function refreshNotifBox(){ const b = $('#notifBox'); if (b) b.innerHTML = notifBoxHtml(); }
 
 /* ---------- stockage : base partagée (db) ou repli local ---------- */
 const store = {
@@ -689,6 +770,7 @@ const store = {
       this.db = db;
       state.mode = 'shared';
       this.listen(db);
+      push.resume();
       if (isNewFamily(code)) {
         try { await this.seedNewFamily(); try { localStorage.removeItem(NEW_FAMILY_KEY); } catch(e) {} }
         catch(e) { console.error(e); toast('Le foyer est créé, mais les données de cet appareil n’ont pas toutes été copiées.'); }
@@ -827,11 +909,12 @@ function taskSheet(t, preOwner){
     const due = validDate(val(f, 'due')) ? val(f, 'due') : '';
     const pts = Number(radio(f, 'pts')) || 2;
     if (isNew) {
-      const data = {title, owner, status:'todo', due, pts, createdAt: Date.now()};
+      const data = {title, owner, status:'todo', due, pts, createdAt: Date.now(), by: meOf()};
       return run(() => store.set('tasks', uid(), data));
     }
     const status = radio(f, 'status') || t.status;
     const fields = {title, owner, pts, due};
+    if (owner !== t.owner) fields.by = meOf();
     if (status === 'done' && t.status !== 'done') {
       const merged = Object.assign({}, t, fields);
       const saved = await run(() => store.set('tasks', t.id, Object.assign(strip(t), fields)));
@@ -968,6 +1051,7 @@ function eventSheet(e, date){
     const d = val(f, 'date');
     if (!validDate(d)) { f.elements.date.focus(); return false; }
     const data = {title, date: d, time: val(f, 'time'), who: radio(f, 'who') || 'all'};
+    if (isNew) data.by = meOf();
     cal.sel = d;
     return run(() => store.set('events', isNew ? uid() : e.id, data));
   }, isNew ? {} : {onDelete: () => deleteWithUndo('events', e, 'Événement supprimé')});
@@ -1071,6 +1155,7 @@ function settingsSheet(addNew){
     '<p class="help" style="margin-bottom:4px">Sur cet appareil :</p>' +
     '<label class="check"><input type="checkbox" name="animOn"' + (ui.fx.anim ? ' checked' : '') + '><span>Animations et confettis</span></label>' +
     '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons</span></label>' +
+    (push.configured() ? '<div class="fld" id="notifBox" style="margin-top:10px">' + notifBoxHtml() + '</div>' : '') +
     (store.backend === 'firebase'
       ? '<p class="help" style="margin-top:12px">Foyer partagé, code <b>' + esc(fmtCode(getFamilyCode())) + '</b>. Sur un autre téléphone, ouvre ce même lien et entre ce code. <button type="button" class="link" data-action="family">Gérer le foyer</button></p>'
       : state.mode === 'shared'
@@ -1856,13 +1941,15 @@ document.addEventListener('click', ev => {
     case 'newTask': if (state.canWrite) taskSheet(null, el.dataset.p || ''); break;
     case 'editTask': { const t = byId('tasks', id); if (t && state.canWrite) taskSheet(t); break; }
     case 'cycle': { const t = byId('tasks', id); if (t) setStatus(t, NEXT[STATUS[t.status] ? t.status : 'todo']); break; }
-    case 'assign': run(() => store.update('tasks', id, {owner: el.dataset.p, tookFromPool: true})); break;
+    case 'assign': run(() => store.update('tasks', id, {owner: el.dataset.p, tookFromPool: true, by: meOf()})); break;
     case 'toggleCol': ui.hiddenCols[el.dataset.p] = !ui.hiddenCols[el.dataset.p]; savePrefs(); renderTasks(); break;
     case 'statusFilter': ui.status = el.dataset.s; savePrefs(); renderTasks(); break;
     case 'toggleDone': ui.hideDone = !ui.hideDone; savePrefs(); renderTasks(); break;
     case 'settings': if (state.canWrite) settingsSheet(); else if (state.mode === 'nofamily') familySheet(); else toast('Lecture seule.'); break;
     case 'addMember': if (state.canWrite) settingsSheet(true); else if (state.mode === 'nofamily') familySheet(); else toast('Lecture seule.'); break;
     case 'addMemberRow': addMemberRow(); break;
+    case 'notifOn': push.enable().then(refreshNotifBox); break;
+    case 'notifOff': push.disable().then(refreshNotifBox); break;
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
     case 'closeSheet': closeSheet(); break;
     case 'family': if (store.backend === 'firebase') familySheet(); break;
@@ -1894,7 +1981,7 @@ document.addEventListener('click', ev => {
     case 'missionShuffle': { const d = todayStr(); ui.missionShift[d] = (ui.missionShift[d] || 0) + 1; savePrefs(); renderAll(); break; }
     case 'badgeInfo': { const b = BADGES.filter(x => x.id === el.dataset.b)[0]; if (b) toast(b.name + ' : ' + b.desc + (badgesOf(meOf())[b.id] ? ' (obtenu)' : ' (à débloquer)')); break; }
     case 'jokerNew': { if (!state.canWrite) break; if (jokersLeft(meOf(), el.dataset.k) < 1) { toast('Plus de joker de ce type cette semaine.'); break; } jokerSheet(el.dataset.k); break; }
-    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.update('tasks', t.id, {owner: j.to}); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) toast('Échange accepté.'); }); break; }
+    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.update('tasks', t.id, {owner: j.to, by: meOf()}); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) toast('Échange accepté.'); }); break; }
     case 'jokerRefuse': run(() => store.update('jokers', id, {status: 'refused'})); break;
     case 'jokerCancel': run(() => store.update('jokers', id, {status: 'cancelled'})); break;
     case 'helpTake': run(() => store.update('jokers', id, {status: 'accepted', helper: meOf()})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">Un coup de main, c’est précieux.</p>', 2400); tone([[660,.12],[880,.16]]); } }); break;
@@ -1902,7 +1989,7 @@ document.addEventListener('click', ev => {
     case 'spin': doSpin(); break;
     case 'menu': menuSheet(); break;
     case 'profile': profileSheet(); break;
-    case 'setMe': ui.me = el.dataset.p; ui.meSet = true; savePrefs(); closeSheet(); renderAll(); break;
+    case 'setMe': ui.me = el.dataset.p; ui.meSet = true; savePrefs(); closeSheet(); renderAll(); push.setWho(); break;
     case 'prizeUsed': run(() => store.update('spins', id, {used: true})); break;
     case 'histToggle': histAll = !histAll; renderAll(); break;
   }
