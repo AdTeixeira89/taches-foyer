@@ -38,7 +38,7 @@ Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'
 À faire une seule fois :
 
 1. **Forfait Blaze** : console Firebase, roue dentée, *Utilisation et facturation*, *Modifier le forfait*, Blaze (carte bancaire demandée par Google). L'usage d'une famille reste dans les quotas gratuits. Ajoute une alerte de budget (par exemple 1 €).
-2. **Clé Web Push** : *Paramètres du projet*, onglet *Cloud Messaging*, section *Configuration Web*, *Générer une paire de clés*. Copie la clé publique (elle commence par `B`) dans `index.html`, à la place de `null` dans `const FCM_VAPID_KEY = null;`.
+2. **Clé Web Push** : faite. La clé publique du projet est déjà dans `index.html` (`FCM_VAPID_KEY`). Pour la changer : *Paramètres du projet*, onglet *Cloud Messaging*, section *Configuration Web*, *Générer une paire de clés*.
 3. **Déployer les fonctions** depuis Google Cloud Shell (https://shell.cloud.google.com, avec le compte Google du projet) :
    ```
    git clone https://github.com/AdTeixeira89/taches-foyer.git && cd taches-foyer
