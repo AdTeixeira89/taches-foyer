@@ -1,0 +1,70 @@
+name: Déploiement Firebase (notifications)
+
+# Déploie les Cloud Functions (functions/) et les règles Firestore (firestore.rules) du projet taches-foyer.
+#  - à la main : onglet Actions, « Déploiement Firebase (notifications) », Run workflow
+#  - automatiquement : quand un de ces fichiers change sur main
+# Il faut le secret FIREBASE_SERVICE_ACCOUNT (clé JSON d'un compte de service), voir le README.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.firebaserc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - name: Vérifier la clé du compte de service
+        id: key
+        run: |
+          if [ -z "$SA_KEY" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "::error::Le secret FIREBASE_SERVICE_ACCOUNT est absent : ajoute-le (Settings, Secrets and variables, Actions), puis relance."
+              exit 1
+            fi
+            echo "::warning::Le secret FIREBASE_SERVICE_ACCOUNT est absent : rien n'est déployé (voir le README, « Déploiement automatique depuis GitHub »)."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.present == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Installer les dépendances des fonctions
+        if: steps.key.outputs.present == 'true'
+        run: npm ci --prefix functions
+
+      - name: Tester la logique des notifications
+        if: steps.key.outputs.present == 'true'
+        run: npm test --prefix functions
+
+      - name: Authentification Google Cloud
+        if: steps.key.outputs.present == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Déployer les fonctions et les règles Firestore
+        if: steps.key.outputs.present == 'true'
+        run: npx --yes firebase-tools@15 deploy --only functions,firestore:rules --non-interactive --force --project taches-foyer

@@ -51,6 +51,21 @@ Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'
 
 Les tests du code d'envoi se lancent avec `cd functions && npm install && npm test`. Les règles de `firestore.rules` doivent être publiées (étape 3) : les jetons des téléphones sont enregistrés sous `foyers/<code>/devices`, sans lecture possible depuis l'application.
 
+## Déploiement automatique depuis GitHub
+
+Alternative à Cloud Shell, utilisable depuis un iPhone. Une fois configuré, les fonctions et les règles Firestore se déploient en un appui (onglet *Actions*, *Déploiement Firebase (notifications)*, *Run workflow*), et automatiquement quand `functions/`, `firestore.rules` ou `firebase.json` changent sur `main`. Avant de déployer, le workflow `.github/workflows/firebase-deploy.yml` relance les tests des fonctions. Même principe que l'application App-Contremaitres.
+
+À faire une seule fois, dans un navigateur (sur iPhone, utilise *Demander le site web pour ordinateur* si la page est trop serrée) :
+
+1. **Compte de service** : https://console.cloud.google.com, choisis le projet `taches-foyer` (sélecteur en haut), *IAM et administration*, *Comptes de service*, *Créer un compte de service*. Nom : `github-deploy`. À l'étape des rôles, ajoute : **Éditeur** (`roles/editor`), **Administrateur Firebase** (`roles/firebase.admin`) et **Utilisateur du compte de service** (`roles/iam.serviceAccountUser`).
+2. **Clé** : ouvre ce compte de service, onglet *Clés*, *Ajouter une clé*, *Créer une clé*, format **JSON**. Un fichier est téléchargé.
+3. **Secret GitHub** : dans le dépôt, *Settings*, *Secrets and variables*, *Actions*, *New repository secret*. Nom : `FIREBASE_SERVICE_ACCOUNT`. Valeur : tout le contenu du fichier JSON, de `{` à `}`. Sur iPhone, ouvre le fichier dans l'app *Fichiers*, sélectionne tout le texte et copie-le. Ne partage jamais cette clé (ni message, ni code, ni capture d'écran).
+4. **Lancer** : onglet *Actions*, *Déploiement Firebase (notifications)*, *Run workflow*. Un déploiement réussi s'affiche en vert (compte 5 à 10 minutes la première fois).
+
+Si le journal signale un droit manquant ou un service non activé, ajoute le rôle ou active le service indiqué dans le message, puis relance. Si Google refuse la création de clé (règle d'organisation), utilise Cloud Shell à la place. En cas de fuite, supprime la clé dans l'onglet *Clés* du compte de service et recrées-en une.
+
+Sans le secret, un changement poussé sur `main` ne déploie rien (simple avertissement) ; un lancement manuel échoue avec un message clair.
+
 ## Version claude.ai
 
 La même page est publiée sur claude.ai : https://claude.ai/artifact/XyDceVrGTqUB2qQG4faGsM. Elle utilise la base intégrée à claude.ai (indépendante de Firebase). Pour la partager, inviter chaque membre par e-mail avec le niveau **Éditeur**, sans lien public.
