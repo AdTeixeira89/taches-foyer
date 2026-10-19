@@ -1,7 +1,7 @@
 'use strict';
 /* Family Play : qui doit être prévenu, et de quoi. Logique pure (sans Firebase), testée dans notify.test.js.
    Chaque fonction reçoit l'état d'un document avant/après son écriture et renvoie une liste de messages :
-   { to: ['m1', ...] | 'all', except: identifiant évité quand to = 'all', title, body, tag } */
+   { to: ['m1', ...] | 'all', except: identifiant(s) évité(s) quand to = 'all', title, body, tag } */
 
 const clip = (s, n) => { s = String(s == null ? '' : s).trim(); return s.length > (n || 80) ? s.slice(0, (n || 80) - 1) + '…' : s; };
 const quote = s => '« ' + clip(s) + ' »';
@@ -13,10 +13,22 @@ function nameResolver(settings){
   return k => names[k] || 'Quelqu’un';
 }
 
-// une tâche confiée à quelqu'un d'autre que soi
-function planTask(before, after, nameOf){
-  if (!after || after.status === 'done' || !after.owner) return [];
-  if (before && before.owner === after.owner) return [];
+// une tâche : à sa création, tout le monde sauf l'auteur est prévenu ; la personne à qui elle est confiée
+// reçoit un message qui lui est destiné (et pas deux). Plus tard, une tâche confiée à quelqu'un d'autre le prévient.
+const FRESH_MS = 5 * 60 * 1000;  // on ne prévient que pour une création récente (pas pour une tâche recopiée ou restaurée)
+function planTask(before, after, nameOf, now){
+  if (!after || after.status === 'done') return [];
+  if (!before) {
+    if (!after.by || !(Number(after.createdAt) > 0) || (now || Date.now()) - Number(after.createdAt) > FRESH_MS) return [];
+    const out = [], title = quote(after.title), author = nameOf(after.by);
+    const toOwner = after.owner && after.owner !== after.by;
+    if (toOwner) out.push({to: [after.owner], title: 'Une tâche pour toi', body: author + ' te confie ' + title, tag: 'task-' + (after.title || '')});
+    const others = [after.by].concat(toOwner ? [after.owner] : []);
+    if (!after.owner) out.push({to: 'all', except: others, title: 'Nouvelle tâche à prendre', body: author + ' a ajouté ' + title + '. Qui la prend ?', tag: 'task-new-' + (after.title || '')});
+    else out.push({to: 'all', except: others, title: 'Nouvelle tâche', body: author + ' a ajouté ' + title + (after.owner === after.by ? '' : ' pour ' + nameOf(after.owner)) + '.', tag: 'task-new-' + (after.title || '')});
+    return out;
+  }
+  if (!after.owner || before.owner === after.owner) return [];
   if (!after.by || after.by === after.owner) return [];
   return [{to: [after.owner], title: 'Une tâche pour toi', body: nameOf(after.by) + ' te confie ' + quote(after.title), tag: 'task-' + (after.title || '')}];
 }
@@ -71,7 +83,8 @@ function planWeek(before, after, nameOf){
 
 // quels appareils reçoivent un message ?
 function pickDevices(devices, msg){
-  return devices.filter(d => d && d.token && (msg.to === 'all' ? d.who !== msg.except : msg.to.indexOf(d.who) >= 0));
+  const except = [].concat(msg.except || []).filter(Boolean);
+  return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
 module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, pickDevices, dateLabel};

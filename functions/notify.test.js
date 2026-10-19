@@ -11,26 +11,54 @@ test('prénoms : base, membres ajoutés, inconnu', () => {
   assert.equal(n.nameResolver(null)('b'), 'Maman');
 });
 
-test('tâche confiée à quelqu\'un d\'autre : le destinataire est prévenu', () => {
-  const r = n.planTask(null, {title: 'Sortir les poubelles', owner: 'b', by: 'a', status: 'todo'}, nameOf);
-  assert.equal(r.length, 1);
+const NOW = 1000000000000, fresh = {createdAt: NOW - 1000};
+const create = o => n.planTask(null, Object.assign({title: 'Linge', status: 'todo', by: 'a'}, fresh, o), nameOf, NOW);
+
+test('nouvelle tâche confiée à quelqu\'un : le responsable reçoit un message pour lui, les autres un message « nouvelle tâche »', () => {
+  const r = create({owner: 'b'});
+  assert.equal(r.length, 2);
   assert.deepEqual(r[0].to, ['b']);
-  assert.match(r[0].body, /Adao te confie « Sortir les poubelles »/);
+  assert.match(r[0].body, /Adao te confie « Linge »/);
+  assert.equal(r[1].to, 'all');
+  assert.deepEqual(r[1].except, ['a', 'b'], 'ni l\'auteur ni le responsable (déjà prévenu)');
+  assert.match(r[1].body, /Adao a ajouté « Linge » pour Maman/);
 });
-test('tâche : rien si on se l\'attribue, si rien ne change, si terminée, sans auteur ou sans responsable', () => {
-  assert.equal(n.planTask(null, {title: 't', owner: 'a', by: 'a', status: 'todo'}, nameOf).length, 0);
-  assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'b', by: 'a', status: 'doing'}, nameOf).length, 0);
-  assert.equal(n.planTask(null, {title: 't', owner: 'b', by: 'a', status: 'done'}, nameOf).length, 0);
-  assert.equal(n.planTask(null, {title: 't', owner: 'b', status: 'todo'}, nameOf).length, 0);
-  assert.equal(n.planTask(null, {title: 't', owner: '', by: 'a', status: 'todo'}, nameOf).length, 0);
+test('nouvelle tâche « à prendre » : tout le monde sauf l\'auteur', () => {
+  const r = create({owner: ''});
+  assert.equal(r.length, 1);
+  assert.equal(r[0].to, 'all');
+  assert.deepEqual(r[0].except, ['a']);
+  assert.equal(r[0].title, 'Nouvelle tâche à prendre');
+  assert.match(r[0].body, /Qui la prend/);
 });
-test('tâche reprise par un autre responsable : le nouveau est prévenu', () => {
-  const r = n.planTask({owner: 'a'}, {title: 'Vaisselle', owner: 'mx1', by: 'b', status: 'todo'}, nameOf);
+test('nouvelle tâche qu\'on se donne : les autres sont prévenus, pas l\'auteur', () => {
+  const r = create({owner: 'a'});
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].except, ['a']);
+  assert.equal(r[0].body, 'Adao a ajouté « Linge ».');
+});
+test('création : rien sans auteur, sans date, trop ancienne, ou déjà terminée', () => {
+  assert.equal(create({owner: 'b', by: undefined}).length, 0);
+  assert.equal(create({owner: 'b', createdAt: undefined}).length, 0);
+  assert.equal(create({owner: 'b', createdAt: NOW - 10 * 60 * 1000}).length, 0, 'tâche recopiée ou restaurée');
+  assert.equal(create({owner: 'b', status: 'done'}).length, 0);
+});
+test('tâche confiée plus tard à quelqu\'un d\'autre : seul le nouveau responsable est prévenu', () => {
+  const r = n.planTask({owner: 'a', title: 'Vaisselle'}, {title: 'Vaisselle', owner: 'mx1', by: 'b', status: 'todo'}, nameOf);
+  assert.equal(r.length, 1);
   assert.deepEqual(r[0].to, ['mx1']);
+  assert.match(r[0].body, /Maman te confie « Vaisselle »/);
+});
+test('tâche modifiée : rien si le responsable ne change pas, si on se l\'attribue, si terminée, sans auteur ou sans responsable', () => {
+  assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'b', by: 'a', status: 'doing'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'a', by: 'a', status: 'todo'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: 'b', by: 'a', status: 'done'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: 'b', status: 'todo'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: '', by: 'a', status: 'todo'}, nameOf).length, 0);
 });
 test('titre trop long raccourci', () => {
-  const r = n.planTask(null, {title: 'x'.repeat(300), owner: 'b', by: 'a', status: 'todo'}, nameOf);
-  assert.ok(r[0].body.length < 140);
+  const r = create({owner: 'b', title: 'x'.repeat(300)});
+  assert.ok(r[0].body.length < 140 && r[1].body.length < 140);
 });
 
 test('joker échange : demande puis réponse', () => {
@@ -89,4 +117,6 @@ test('appareils visés', () => {
   assert.deepEqual(n.pickDevices(devices, {to: ['b']}).map(d => d.token), ['t2']);
   assert.deepEqual(n.pickDevices(devices, {to: 'all', except: 'a'}).map(d => d.token), ['t2']);
   assert.deepEqual(n.pickDevices(devices, {to: 'all', except: ''}).map(d => d.token), ['t1', 't2', 't3']);
+  assert.deepEqual(n.pickDevices(devices, {to: 'all', except: ['a', 'b']}).map(d => d.token), [], 'plusieurs personnes exclues');
+  assert.deepEqual(n.pickDevices([{token: 't1', who: 'a'}, {token: 't2', who: 'c'}], {to: 'all', except: ['a', 'b']}).map(d => d.token), ['t2']);
 });

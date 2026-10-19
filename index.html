@@ -751,7 +751,7 @@ function notifBoxHtml(){
   }
   return push.on()
     ? '<p class="help"><b>Notifications activées</b> pour ' + esc(pname(meOf())) + ' (le profil de cet appareil).</p><button type="button" class="btn small" data-action="notifOff">Désactiver</button>'
-    : '<p class="help">Reçois une notification quand une tâche t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
+    : '<p class="help">Reçois une notification quand une tâche est ajoutée ou t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
 }
 function refreshNotifBox(){ const b = $('#notifBox'); if (b) b.innerHTML = notifBoxHtml(); }
 

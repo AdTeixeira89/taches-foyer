@@ -33,7 +33,7 @@ Tant que `FIREBASE_CONFIG` vaut `null`, le lien GitHub fonctionne en mode local 
 
 ## Notifications push (même application fermée)
 
-Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'autre, un échange de joker ou une demande d'aide le concerne (et la réponse), un événement du calendrier est créé pour lui ou pour toute la famille, ou la semaine a un champion. Celui qui agit n'est jamais notifié de sa propre action. Elles suivent le profil choisi sur l'appareil. Elles n'existent que sur le lien GitHub (mode Firebase), pas sur la page claude.ai.
+Un téléphone est prévenu quand : une tâche est ajoutée par quelqu'un d'autre (tout le monde sauf l'auteur ; la personne à qui elle est confiée reçoit un message qui lui est destiné, et un seul), une tâche lui est confiée par la suite, un échange de joker ou une demande d'aide le concerne (et la réponse), un événement du calendrier est créé pour lui ou pour toute la famille, ou la semaine a un champion. Celui qui agit n'est jamais notifié de sa propre action. Elles suivent le profil choisi sur l'appareil. Elles n'existent que sur le lien GitHub (mode Firebase), pas sur la page claude.ai.
 
 À faire une seule fois :
 
