@@ -751,7 +751,7 @@ function notifBoxHtml(){
   }
   return push.on()
     ? '<p class="help"><b>Notifications activées</b> pour ' + esc(pname(meOf())) + ' (le profil de cet appareil).</p><button type="button" class="btn small" data-action="notifOff">Désactiver</button>'
-    : '<p class="help">Reçois une notification quand une tâche est ajoutée ou t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
+    : '<p class="help">Reçois une notification quand une tâche est ajoutée ou t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend (aussi la veille à 18 h) ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
 }
 function refreshNotifBox(){ const b = $('#notifBox'); if (b) b.innerHTML = notifBoxHtml(); }
 
@@ -1079,6 +1079,7 @@ function eventSheet(e, date){
     '<div class="row fld"><label style="flex:1"><span class="lab" style="display:block;font-size:13px;color:var(--muted);margin-bottom:5px">Date</span><input type="date" name="date" value="' + esc(e.date) + '"></label>' +
     '<label style="flex:1"><span class="lab" style="display:block;font-size:13px;color:var(--muted);margin-bottom:5px">Heure (facultatif)</span><input type="time" name="time" value="' + esc(e.time) + '"></label></div>' +
     '<div class="fld"><span class="lab">Pour</span>' + radios('who', who, COLORS[e.who] ? e.who : 'all') + '</div>' +
+    (push.configured() ? '<p class="help">Une notification est envoyée la veille à 18 h à la personne concernée (à toute la famille si l’événement est pour tous).' + (push.on() ? '' : ' Active les notifications dans les Paramètres pour la recevoir sur ce téléphone.') + '</p>' : '') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button>' +
     (isNew ? '' : '<button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button>') + '</div>';
   openSheet(isNew ? 'Nouvel événement' : 'Modifier l’événement', body, async f => {

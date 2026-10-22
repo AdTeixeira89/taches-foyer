@@ -83,6 +83,25 @@ function planEvent(before, after, nameOf){
   return [{to: [after.who], title: 'Nouvel événement pour toi', body, tag: 'event'}];
 }
 
+// la veille d'un événement du calendrier : la personne concernée, ou toute la famille (auteur compris)
+const TIMEZONE = 'Europe/Paris';  // fuseau de la famille : « la veille à 18 h » se calcule dans ce fuseau
+function ymdInZone(ms, tz){
+  const p = {};
+  new Intl.DateTimeFormat('en-CA', {timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'}).formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+  return p.year + '-' + p.month + '-' + p.day;
+}
+function addDaysYmd(s, n){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + n));
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+function planEventTomorrow(event){
+  if (!event || !event.title || !/^\d{4}-\d{2}-\d{2}$/.test(event.date || '')) return [];
+  const all = !event.who || event.who === 'all';
+  const body = clip(event.title) + (event.time ? ' à ' + event.time : '') + (all ? ' (toute la famille)' : '');
+  return [{to: all ? 'all' : [event.who], except: '', title: 'Demain dans le calendrier', body, tag: 'event-tomorrow'}];
+}
+
 // semaine terminée : le champion est connu
 function planWeek(before, after, nameOf){
   if (before || !after || !Array.isArray(after.champions) || !after.champions.length) return [];
@@ -96,4 +115,4 @@ function pickDevices(devices, msg){
   return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
-module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, pickDevices, dateLabel, REMIND_WINDOW_MS};
+module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, TIMEZONE};

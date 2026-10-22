@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const CODE = 'ABCD2345EFGH';
-const state = {devices: [], settings: null, sent: [], deleted: [], failToken: null, failCode: 'messaging/registration-token-not-registered', tasks: [], logged: new Set()};
+const state = {devices: [], settings: null, sent: [], deleted: [], failToken: null, failCode: 'messaging/registration-token-not-registered', tasks: [], events: [], logged: new Set()};
 
 function stub(id, exports){ const f = require.resolve(id); require.cache[f] = {id: f, filename: f, loaded: true, exports}; }
 stub('firebase-admin/app', {initializeApp(){}});
@@ -15,7 +15,7 @@ stub('firebase-admin/firestore', {getFirestore: () => ({
     get: async () => ({exists: !!state.settings, data: () => state.settings}),
     create: async () => { if (state.logged.has(p)) { const e = new Error('6 ALREADY_EXISTS: Document already exists'); e.code = 6; throw e; } state.logged.add(p); }
   }),
-  collectionGroup: () => { const q = {where: () => q, get: async () => ({docs: state.tasks.map(t => ({id: t.id, data: () => t.data, ref: {parent: {parent: {id: t.code, parent: {id: t.parent || 'foyers'}}}}}))})}; return q; }
+  collectionGroup: name => { const q = {where: () => q, get: async () => ({docs: (name === 'events' ? state.events : state.tasks).map(t => ({id: t.id, data: () => t.data, ref: {parent: {parent: {id: t.code, parent: {id: t.parent || 'foyers'}}}}}))})}; return q; }
 })});
 stub('firebase-admin/messaging', {getMessaging: () => ({sendEachForMulticast: async msg => {
   state.sent.push(msg);
@@ -25,7 +25,7 @@ stub('firebase-admin/messaging', {getMessaging: () => ({sendEachForMulticast: as
 const fns = require('./index.js');
 const ev = (before, after, code) => ({params: {code: code || CODE, id: 'x'}, data: {
   before: {exists: !!before, data: () => before}, after: {exists: !!after, data: () => after}}});
-const reset = () => { state.tasks = []; state.logged = new Set(); state.devices = [
+const reset = () => { state.tasks = []; state.events = []; state.logged = new Set(); state.devices = [
   {id: 'd1', token: 'tok-a', who: 'a'}, {id: 'd2', token: 'tok-b', who: 'b'}, {id: 'd3', token: 'tok-b2', who: 'b'}];
   state.settings = {names: {a: 'Adao', b: 'Maman', c: 'Fille'}}; state.sent = []; state.deleted = []; state.failToken = null; };
 
@@ -119,3 +119,21 @@ test('rappels : tâche terminée, ancienne ou hors structure foyers ignorées ; 
   assert.deepEqual(state.sent[0].tokens, ['tok-a', 'tok-b', 'tok-b2']);
   assert.match(state.sent[0].notification.body, /Poubelles/);
 });
+
+test('veille d\'événement : envoyée une seule fois, à la bonne personne ou à toute la famille', async () => {
+  reset();
+  const tomorrow = notifyLib().addDaysYmd(notifyLib().ymdInZone(Date.now(), 'Europe/Paris'), 1);
+  state.events = [
+    {id: 'e1', code: CODE, data: {title: 'Dentiste', date: tomorrow, time: '14:30', who: 'b'}},
+    {id: 'e2', code: CODE, data: {title: 'Anniversaire', date: tomorrow, who: 'all', by: 'a'}},
+    {id: 'e3', code: CODE, parent: 'autre', data: {title: 'Ailleurs', date: tomorrow, who: 'all'}}];
+  await fns.sendEventReminders.run({});
+  assert.equal(state.sent.length, 2);
+  const dent = state.sent.find(m => /Dentiste/.test(m.notification.body)), anniv = state.sent.find(m => /Anniversaire/.test(m.notification.body));
+  assert.deepEqual(dent.tokens, ['tok-b', 'tok-b2']);
+  assert.equal(dent.notification.title, 'Demain dans le calendrier');
+  assert.deepEqual(anniv.tokens, ['tok-a', 'tok-b', 'tok-b2'], 'toute la famille, auteur compris');
+  await fns.sendEventReminders.run({});
+  assert.equal(state.sent.length, 2, 'pas de doublon si la fonction repasse');
+});
+function notifyLib(){ return require('./notify'); }

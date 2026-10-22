@@ -132,6 +132,33 @@ test('rappel : rien si pas encore l\'heure, trop ancien, terminé, ou sans heure
   assert.equal(n.planReminder(Object.assign({}, base, {remindAt: 'abc'}), T).length, 0);
 });
 
+test('la veille d\'un événement : la personne concernée, ou toute la famille', () => {
+  const one = n.planEventTomorrow({title: 'Dentiste', date: '2026-10-23', time: '14:30', who: 'c'});
+  assert.deepEqual(one[0].to, ['c']);
+  assert.equal(one[0].title, 'Demain dans le calendrier');
+  assert.equal(one[0].body, 'Dentiste à 14:30');
+  const all = n.planEventTomorrow({title: 'Anniversaire', date: '2026-10-23', who: 'all'});
+  assert.equal(all[0].to, 'all');
+  assert.deepEqual([].concat(all[0].except).filter(Boolean), [], 'auteur compris : on rappelle à tout le monde');
+  assert.equal(all[0].body, 'Anniversaire (toute la famille)');
+  assert.equal(n.planEventTomorrow({title: 'Sans qui', date: '2026-10-23'})[0].to, 'all');
+  assert.equal(n.planEventTomorrow({title: '', date: '2026-10-23'}).length, 0);
+  assert.equal(n.planEventTomorrow({title: 'x', date: 'demain'}).length, 0);
+  assert.equal(n.planEventTomorrow(null).length, 0);
+});
+test('jour de demain dans le fuseau de la famille', () => {
+  // 18 h à Paris le jeudi 22 octobre 2026 (heure d'été, UTC+2) = 16 h UTC
+  assert.equal(n.ymdInZone(Date.UTC(2026, 9, 22, 16, 0), 'Europe/Paris'), '2026-10-22');
+  // 23 h 30 UTC = déjà le lendemain à Paris
+  assert.equal(n.ymdInZone(Date.UTC(2026, 9, 22, 23, 30), 'Europe/Paris'), '2026-10-23');
+  // changement d'heure (fin octobre 2026 : le 25) : 18 h à Paris est 17 h UTC l'hiver
+  assert.equal(n.ymdInZone(Date.UTC(2026, 9, 25, 17, 0), 'Europe/Paris'), '2026-10-25');
+  assert.equal(n.addDaysYmd('2026-10-22', 1), '2026-10-23');
+  assert.equal(n.addDaysYmd('2026-10-31', 1), '2026-11-01');
+  assert.equal(n.addDaysYmd('2026-12-31', 1), '2027-01-01');
+  assert.equal(n.addDaysYmd('2028-02-28', 1), '2028-02-29', 'année bissextile');
+});
+
 test('appareils visés', () => {
   const devices = [{token: 't1', who: 'a'}, {token: 't2', who: 'b'}, {token: 't3', who: 'a'}, {token: '', who: 'b'}, null];
   assert.deepEqual(n.pickDevices(devices, {to: ['b']}).map(d => d.token), ['t2']);

@@ -47,20 +47,39 @@ function watch(path, plan){
   });
 }
 
-// Rappels : chaque minute, on cherche les tâches dont l'heure de rappel vient de passer.
-// Un document foyers/<code>/reminderLog/<tâche>_<heure> est créé avant l'envoi : un rappel ne part jamais deux fois.
+// Un document foyers/<code>/reminderLog/<clé> est créé avant chaque envoi planifié : il ne part jamais deux fois.
+const homeCode = d => { const home = d.ref.parent.parent; return home && home.parent && home.parent.id === 'foyers' && /^[A-Z0-9]{12}$/.test(home.id) ? home.id : null; };
+async function claim(db, code, key){
+  try { await db.doc('foyers/' + code + '/reminderLog/' + key).create({at: Date.now()}); return true; }
+  catch (e) { if (e && (e.code === 6 || /already exists/i.test(String(e.message || '')))) return false; throw e; }
+}
+
+// Rappels de tâches : chaque minute, on cherche les tâches dont l'heure de rappel vient de passer.
 exports.sendReminders = onSchedule({schedule: 'every 1 minutes', region: REGION, timeoutSeconds: 120}, async () => {
   const db = getFirestore(), now = Date.now();
   const snap = await db.collectionGroup('tasks').where('remindAt', '>=', now - notify.REMIND_WINDOW_MS).where('remindAt', '<=', now).get();
   const byCode = {};
   for (const d of snap.docs) {
-    const home = d.ref.parent.parent;  // foyers/<code>
-    if (!home || !home.parent || home.parent.id !== 'foyers' || !/^[A-Z0-9]{12}$/.test(home.id)) continue;
+    const code = homeCode(d);
+    if (!code) continue;
     const task = d.data(), messages = notify.planReminder(task, now);
-    if (!messages.length) continue;
-    try { await db.doc('foyers/' + home.id + '/reminderLog/' + d.id + '_' + task.remindAt).create({at: now}); }
-    catch (e) { if (e && (e.code === 6 || /already exists/i.test(String(e.message || '')))) continue; throw e; }
-    (byCode[home.id] = byCode[home.id] || []).push(...messages);
+    if (!messages.length || !(await claim(db, code, d.id + '_' + task.remindAt))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
+  }
+  for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
+});
+
+// Événements du calendrier : chaque soir à 18 h, on prévient pour le lendemain.
+exports.sendEventReminders = onSchedule({schedule: '0 18 * * *', timeZone: notify.TIMEZONE, region: REGION, timeoutSeconds: 120}, async () => {
+  const db = getFirestore(), tomorrow = notify.addDaysYmd(notify.ymdInZone(Date.now(), notify.TIMEZONE), 1);
+  const snap = await db.collectionGroup('events').where('date', '==', tomorrow).get();
+  const byCode = {};
+  for (const d of snap.docs) {
+    const code = homeCode(d);
+    if (!code) continue;
+    const messages = notify.planEventTomorrow(d.data());
+    if (!messages.length || !(await claim(db, code, 'event_' + d.id + '_' + tomorrow))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
   }
   for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
 });
