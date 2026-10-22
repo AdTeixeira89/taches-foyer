@@ -112,6 +112,26 @@ test('champion de la semaine : toute la famille, égalité incluse', () => {
   assert.equal(n.planWeek({champions: ['a']}, {champions: ['a']}, nameOf).length, 0);
 });
 
+test('rappel : au responsable, ou à tous si la tâche est à prendre', () => {
+  const T = 1000000000000;
+  const own = n.planReminder({title: 'Médicament', owner: 'b', remindAt: T - 30000, status: 'todo'}, T);
+  assert.equal(own.length, 1);
+  assert.deepEqual(own[0].to, ['b']);
+  assert.equal(own[0].title, 'Rappel');
+  assert.match(own[0].body, /C’est l’heure : « Médicament »/);
+  const pool = n.planReminder({title: 'Poubelles', owner: '', remindAt: T - 1000, status: 'todo'}, T);
+  assert.equal(pool[0].to, 'all');
+  assert.match(pool[0].body, /Une tâche à prendre : « Poubelles »/);
+});
+test('rappel : rien si pas encore l\'heure, trop ancien, terminé, ou sans heure', () => {
+  const T = 1000000000000, base = {title: 'x', owner: 'a', status: 'todo'};
+  assert.equal(n.planReminder(Object.assign({}, base, {remindAt: T + 1000}), T).length, 0, 'pas encore');
+  assert.equal(n.planReminder(Object.assign({}, base, {remindAt: T - n.REMIND_WINDOW_MS - 1}), T).length, 0, 'raté depuis plus d\'une heure');
+  assert.equal(n.planReminder(Object.assign({}, base, {remindAt: T - 1000, status: 'done'}), T).length, 0, 'tâche terminée');
+  assert.equal(n.planReminder(base, T).length, 0);
+  assert.equal(n.planReminder(Object.assign({}, base, {remindAt: 'abc'}), T).length, 0);
+});
+
 test('appareils visés', () => {
   const devices = [{token: 't1', who: 'a'}, {token: 't2', who: 'b'}, {token: 't3', who: 'a'}, {token: '', who: 'b'}, null];
   assert.deepEqual(n.pickDevices(devices, {to: ['b']}).map(d => d.token), ['t2']);

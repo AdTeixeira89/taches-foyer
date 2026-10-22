@@ -33,6 +33,15 @@ function planTask(before, after, nameOf, now){
   return [{to: [after.owner], title: 'Une tâche pour toi', body: nameOf(after.by) + ' te confie ' + quote(after.title), tag: 'task-' + (after.title || '')}];
 }
 
+// rappel d'une tâche à l'heure choisie (champ remindAt, en millisecondes) : au responsable, ou à tous si la tâche est « à prendre »
+const REMIND_WINDOW_MS = 60 * 60 * 1000;  // un rappel manqué de plus d'une heure n'est plus envoyé
+function planReminder(task, now){
+  const at = Number(task && task.remindAt), t = now || Date.now();
+  if (!(at > 0) || task.status === 'done' || at > t || t - at > REMIND_WINDOW_MS) return [];
+  const title = quote(task.title);
+  return [{to: task.owner ? [task.owner] : 'all', except: '', title: 'Rappel', body: task.owner ? 'C’est l’heure : ' + title : 'Une tâche à prendre : ' + title, tag: 'remind-' + (task.title || '')}];
+}
+
 // jokers : demande d'échange ou d'aide, puis réponse
 function planJoker(before, after, nameOf){
   if (!after) return [];
@@ -87,4 +96,4 @@ function pickDevices(devices, msg){
   return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
-module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, pickDevices, dateLabel};
+module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, pickDevices, dateLabel, REMIND_WINDOW_MS};

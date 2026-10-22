@@ -899,16 +899,35 @@ const val = (f, n) => { const el = f.elements[n]; return el ? (el.value || '').t
 const radio = (f, n) => { const el = f.querySelector('input[name="' + n + '"]:checked'); return el ? el.value : ''; };
 
 /* ---------- tâches ---------- */
+/* ---------- rappel d'une tâche : notification à l'heure choisie (mode Firebase) ---------- */
+function remindParts(ms){
+  if (!(Number(ms) > 0)) return {d: '', t: ''};
+  const x = new Date(Number(ms));
+  return {d: ymd(x), t: pad(x.getHours()) + ':' + pad(x.getMinutes())};
+}
+// jour et heure saisis -> millisecondes (heure locale) ; jour seul = 9 h, heure seule = aujourd'hui
+function remindFrom(dStr, tStr){
+  const d = validDate(dStr) ? dStr : '', tm = /^\d{2}:\d{2}$/.test(tStr || '') ? tStr : '';
+  if (!d && !tm) return 0;
+  const a = (d || todayStr()).split('-').map(Number), b = (tm || '09:00').split(':').map(Number);
+  return new Date(a[0], a[1] - 1, a[2], b[0], b[1]).getTime();
+}
+const remindLabel = ms => { const p = remindParts(ms); return relDate(p.d) + ' ' + p.t; };
+const withRemind = (o, ms) => { if (ms) o.remindAt = ms; else delete o.remindAt; return o; };
+
 function taskSheet(t, preOwner){
   const isNew = !t;
   t = t || {title:'', owner: preOwner || '', status:'todo', due:'', pts:2};
   const owners = [['', 'Personne', 'var(--done)']].concat(activePeople().map(p => [p, pname(p), COLORS[p]]));
+  const rp = remindParts(t.remindAt);
   const body =
     '<label class="fld"><span>Tâche</span><input type="text" name="title" maxlength="140" autocomplete="off" enterkeyhint="done" value="' + esc(t.title) + '" placeholder="Ex. Appeler l\'école"></label>' +
     '<div class="fld"><span class="lab">Responsable</span>' + radios('owner', owners, t.owner) + '</div>' +
     '<div class="fld"><span class="lab">Difficulté (points à la fin)</span>' + radios('pts', LEVELS.map(l => [String(l[0]), l[1]]), String(Number(t.pts) || 2)) + '</div>' +
     (isNew ? '' : '<div class="fld"><span class="lab">Statut</span>' + radios('status', Object.keys(STATUS).map(k => [k, STATUS[k]]), t.status) + '</div>') +
     '<label class="fld"><span>Date limite (facultatif)</span><div class="row"><input type="date" name="due" value="' + esc(t.due) + '"><button type="button" class="link" data-action="clearDue">Effacer</button></div></label>' +
+    (push.configured() ? '<div class="fld"><span class="lab">Rappel (facultatif)</span><div class="row" style="flex-wrap:wrap"><input type="date" name="remindDate" aria-label="Jour du rappel" value="' + esc(rp.d) + '" style="flex:1 1 9em;width:auto;min-width:0"><input type="time" name="remindTime" aria-label="Heure du rappel" value="' + esc(rp.t) + '" style="flex:0 1 8.5em;width:auto;min-width:0"><button type="button" class="link" data-action="clearRemind">Effacer</button></div>' +
+      '<p class="help" style="margin:6px 0 0">Une notification est envoyée à l’heure choisie à la personne responsable, ou à toute la famille si personne n’est désigné.' + (push.on() ? '' : ' Active les notifications dans les Paramètres pour la recevoir sur ce téléphone.') + '</p></div>' : '') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button>' +
     (isNew ? '' : '<button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button>') + '</div>';
   openSheet(isNew ? 'Nouvelle tâche' : 'Modifier la tâche', body, async f => {
@@ -917,8 +936,15 @@ function taskSheet(t, preOwner){
     const owner = radio(f, 'owner');
     const due = validDate(val(f, 'due')) ? val(f, 'due') : '';
     const pts = Number(radio(f, 'pts')) || 2;
+    // rappel : champ proposé seulement quand les notifications existent ; sinon on garde ce qui était déjà enregistré
+    const prevRemind = Number(t.remindAt) || 0;
+    let remindAt = prevRemind;
+    if (push.configured()) {
+      remindAt = remindFrom(val(f, 'remindDate'), val(f, 'remindTime'));
+      if (remindAt && remindAt !== prevRemind && remindAt < Date.now() - 60000) { toast('L’heure du rappel est déjà passée.'); return false; }
+    }
     if (isNew) {
-      const data = {title, owner, status:'todo', due, pts, createdAt: Date.now(), by: meOf()};
+      const data = withRemind({title, owner, status:'todo', due, pts, createdAt: Date.now(), by: meOf()}, remindAt);
       return run(() => store.set('tasks', uid(), data));
     }
     const status = radio(f, 'status') || t.status;
@@ -926,11 +952,11 @@ function taskSheet(t, preOwner){
     if (owner !== t.owner) fields.by = meOf();
     if (status === 'done' && t.status !== 'done') {
       const merged = Object.assign({}, t, fields);
-      const saved = await run(() => store.set('tasks', t.id, Object.assign(strip(t), fields)));
+      const saved = await run(() => store.set('tasks', t.id, withRemind(Object.assign(strip(t), fields), remindAt)));
       if (!saved) return false;
       closeSheet(); finishTask(merged); return 'keep';
     }
-    return run(() => store.set('tasks', t.id, Object.assign(strip(t), fields, {status})));
+    return run(() => store.set('tasks', t.id, withRemind(Object.assign(strip(t), fields, {status}), remindAt)));
   }, isNew ? {} : {onDelete: () => deleteWithUndo('tasks', t, 'Tâche supprimée')});
 }
 function deleteWithUndo(col, obj, msg){
@@ -986,6 +1012,7 @@ function taskCard(t, assign){
   const pills = '<span class="pill tier">' + T.label + '</span>' +
     '<span class="pill pts">' + IC.star(12) + (got ? '+' : '') + pv + ' pt' + (pv > 1 ? 's' : '') + '</span>' +
     (t.due ? '<span class="pill' + (late ? ' late' : '') + '">' + ico('cal', 12) + esc(relDate(t.due)) + '</span>' : '') +
+    (Number(t.remindAt) > 0 && s !== 'done' ? '<span class="pill" title="Rappel">' + ico('bell', 12) + esc(remindLabel(t.remindAt)) + '</span>' : '') +
     (s === 'doing' ? '<span class="pill doing">En cours</span>' : '') + (s === 'done' ? '<span class="pill okp">Fait</span>' : '');
   const av = assign ? '<span class="assign">' + activePeople().map(p =>
     '<button type="button" class="av-btn" data-action="assign" data-id="' + esc(t.id) + '" data-p="' + p + '" aria-label="Attribuer à ' + esc(pname(p)) + '" title="' + esc(pname(p)) + '">' + avatar(p, 40) + '</button>').join('') + '</span>' : '';
@@ -1628,6 +1655,7 @@ function rewardArt(text){
 }
 const NAVIC = {
   home: GLYPH.home,
+  bell: '<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7zM10 20a2 2 0 0 0 4 0"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
   flame: GLYPH.flame,
   wheel: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6L6 18"/>',
@@ -1960,6 +1988,7 @@ document.addEventListener('click', ev => {
     case 'notifOn': push.enable().then(refreshNotifBox); break;
     case 'notifOff': push.disable().then(refreshNotifBox); break;
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
+    case 'clearRemind': { const f = $('#sheetForm'); if (f && f.elements.remindDate) { f.elements.remindDate.value = ''; f.elements.remindTime.value = ''; } break; }
     case 'closeSheet': closeSheet(); break;
     case 'family': if (store.backend === 'firebase') familySheet(); break;
     case 'reload': location.reload(); break;

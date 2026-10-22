@@ -1,6 +1,6 @@
 name: Déploiement Firebase (notifications)
 
-# Déploie les Cloud Functions (functions/) et les règles Firestore (firestore.rules) du projet taches-foyer.
+# Déploie les Cloud Functions (functions/), les règles et les index Firestore (firestore.rules, firestore.indexes.json) du projet taches-foyer.
 #  - à la main : onglet Actions, « Déploiement Firebase (notifications) », Run workflow
 #  - automatiquement : quand un de ces fichiers change sur main
 # Il faut le secret FIREBASE_SERVICE_ACCOUNT (clé JSON d'un compte de service), voir le README.
@@ -11,6 +11,7 @@ on:
     paths:
       - 'functions/**'
       - 'firestore.rules'
+      - 'firestore.indexes.json'
       - 'firebase.json'
       - '.firebaserc'
 
@@ -67,4 +68,4 @@ jobs:
 
       - name: Déployer les fonctions et les règles Firestore
         if: steps.key.outputs.present == 'true'
-        run: npx --yes firebase-tools@15 deploy --only functions,firestore:rules --non-interactive --force --project taches-foyer
+        run: npx --yes firebase-tools@15 deploy --only functions,firestore --non-interactive --force --project taches-foyer
