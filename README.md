@@ -14,6 +14,10 @@ Activation : Settings, Pages, Deploy from a branch, branche `main`, dossier `/ (
 
 Au départ, la famille compte trois profils (Adao, Maman, Fille). Pour en ajouter (grands-parents, cousins, autre enfant…) : **Famille > + Ajouter un membre**, ou **Paramètres > Autres membres**, ou dans « Qui utilise cet appareil ? ». Chaque membre a son prénom, son avatar et sa couleur, et joue comme les autres : colonne de tâches, points, classement, jokers et un tour de roulette par semaine. Jusqu'à 8 membres au total. Décocher « Afficher ce membre » le masque sans rien effacer (ses points et son historique restent).
 
+**Plusieurs participants** : une tâche peut être confiée à plusieurs personnes (cases « Responsable(s) »). À la fin, l'app demande qui a participé ; chaque participant reçoit les points complets, une seule fois par tâche. Le défi de la famille compte la tâche une seule fois.
+
+**Actualiser** : sur téléphone, tire la page vers le bas depuis le haut de l'écran (ou Paramètres > Actualiser l'app) pour charger la dernière version.
+
 ## Avoir les mêmes données pour toute la famille (lien GitHub)
 
 Les données sont rangées dans une base Firebase (Firestore), comme pour app-sante. À faire une seule fois :

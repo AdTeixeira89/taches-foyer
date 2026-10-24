@@ -13,33 +13,46 @@ function nameResolver(settings){
   return k => names[k] || 'Quelqu’un';
 }
 
-// une tâche : à sa création, tout le monde sauf l'auteur est prévenu ; la personne à qui elle est confiée
+// responsables d'une tâche : champ facultatif owners (plusieurs participants), sinon owner (un seul, anciennes données)
+function ownersOf(t){
+  const l = Array.isArray(t && t.owners) && t.owners.length ? t.owners : (t && t.owner ? [t.owner] : []);
+  return Array.from(new Set(l.filter(x => typeof x === 'string' && x)));
+}
+const joinNames = (list, nameOf) => list.map(nameOf).join(list.length > 2 ? ', ' : ' et ').replace(/, ([^,]*)$/, ' et $1');
+
+// une tâche : à sa création, tout le monde sauf l'auteur est prévenu ; chaque personne à qui elle est confiée
 // reçoit un message qui lui est destiné (et pas deux). Plus tard, une tâche confiée à quelqu'un d'autre le prévient.
 const FRESH_MS = 5 * 60 * 1000;  // on ne prévient que pour une création récente (pas pour une tâche recopiée ou restaurée)
 function planTask(before, after, nameOf, now){
   if (!after || after.status === 'done') return [];
+  const owners = ownersOf(after), tag = 'task-' + (after.title || '');
+  const forYou = (author, others) => author + ' te confie ' + quote(after.title) + (others.length ? ' avec ' + joinNames(others, nameOf) : '');
   if (!before) {
     if (!after.by || !(Number(after.createdAt) > 0) || (now || Date.now()) - Number(after.createdAt) > FRESH_MS) return [];
     const out = [], title = quote(after.title), author = nameOf(after.by);
-    const toOwner = after.owner && after.owner !== after.by;
-    if (toOwner) out.push({to: [after.owner], title: 'Une tâche pour toi', body: author + ' te confie ' + title, tag: 'task-' + (after.title || '')});
-    const others = [after.by].concat(toOwner ? [after.owner] : []);
-    if (!after.owner) out.push({to: 'all', except: others, title: 'Nouvelle tâche à prendre', body: author + ' a ajouté ' + title + '. Qui la prend ?', tag: 'task-new-' + (after.title || '')});
-    else out.push({to: 'all', except: others, title: 'Nouvelle tâche', body: author + ' a ajouté ' + title + (after.owner === after.by ? '' : ' pour ' + nameOf(after.owner)) + '.', tag: 'task-new-' + (after.title || '')});
+    const targets = owners.filter(o => o !== after.by);
+    targets.forEach(o => out.push({to: [o], title: 'Une tâche pour toi', body: forYou(author, owners.filter(x => x !== o)), tag}));
+    const skip = [after.by].concat(targets);
+    if (!owners.length) out.push({to: 'all', except: skip, title: 'Nouvelle tâche à prendre', body: author + ' a ajouté ' + title + '. Qui la prend ?', tag: 'task-new-' + (after.title || '')});
+    else {
+      const forWho = owners.length === 1 && owners[0] === after.by ? '' : ' pour ' + joinNames(owners, nameOf);
+      out.push({to: 'all', except: skip, title: 'Nouvelle tâche', body: author + ' a ajouté ' + title + forWho + '.', tag: 'task-new-' + (after.title || '')});
+    }
     return out;
   }
-  if (!after.owner || before.owner === after.owner) return [];
-  if (!after.by || after.by === after.owner) return [];
-  return [{to: [after.owner], title: 'Une tâche pour toi', body: nameOf(after.by) + ' te confie ' + quote(after.title), tag: 'task-' + (after.title || '')}];
+  if (!owners.length || !after.by) return [];
+  const before0 = ownersOf(before);
+  return owners.filter(o => before0.indexOf(o) < 0 && o !== after.by)
+    .map(o => ({to: [o], title: 'Une tâche pour toi', body: forYou(nameOf(after.by), owners.filter(x => x !== o)), tag}));
 }
 
-// rappel d'une tâche à l'heure choisie (champ remindAt, en millisecondes) : au responsable, ou à tous si la tâche est « à prendre »
+// rappel d'une tâche à l'heure choisie (champ remindAt, en millisecondes) : aux responsables, ou à tous si la tâche est « à prendre »
 const REMIND_WINDOW_MS = 60 * 60 * 1000;  // un rappel manqué de plus d'une heure n'est plus envoyé
 function planReminder(task, now){
   const at = Number(task && task.remindAt), t = now || Date.now();
   if (!(at > 0) || task.status === 'done' || at > t || t - at > REMIND_WINDOW_MS) return [];
-  const title = quote(task.title);
-  return [{to: task.owner ? [task.owner] : 'all', except: '', title: 'Rappel', body: task.owner ? 'C’est l’heure : ' + title : 'Une tâche à prendre : ' + title, tag: 'remind-' + (task.title || '')}];
+  const title = quote(task.title), owners = ownersOf(task);
+  return [{to: owners.length ? owners : 'all', except: '', title: 'Rappel', body: owners.length ? 'C’est l’heure : ' + title : 'Une tâche à prendre : ' + title, tag: 'remind-' + (task.title || '')}];
 }
 
 // jokers : demande d'échange ou d'aide, puis réponse
@@ -115,4 +128,4 @@ function pickDevices(devices, msg){
   return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
-module.exports = {clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, TIMEZONE};
+module.exports = {ownersOf, clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, TIMEZONE};

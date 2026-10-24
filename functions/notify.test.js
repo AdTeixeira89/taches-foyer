@@ -167,3 +167,38 @@ test('appareils visés', () => {
   assert.deepEqual(n.pickDevices(devices, {to: 'all', except: ['a', 'b']}).map(d => d.token), [], 'plusieurs personnes exclues');
   assert.deepEqual(n.pickDevices([{token: 't1', who: 'a'}, {token: 't2', who: 'c'}], {to: 'all', except: ['a', 'b']}).map(d => d.token), ['t2']);
 });
+
+test('plusieurs responsables : chacun reçoit son message avec les autres, les autres membres un message commun', () => {
+  const r = create({owner: 'b', owners: ['b', 'c', 'mx1']});
+  const perso = r.filter(m => m.to !== 'all');
+  assert.deepEqual(perso.map(m => m.to[0]), ['b', 'c', 'mx1']);
+  assert.match(perso[0].body, /Adao te confie « Linge » avec Fille et/);
+  assert.equal(perso[0].body.includes('Maman'), false, 'on ne cite pas la personne elle-même');
+  const all = r.find(m => m.to === 'all');
+  assert.deepEqual(all.except, ['a', 'b', 'c', 'mx1']);
+  assert.match(all.body, /pour Maman, Fille et /);
+});
+test('auteur parmi plusieurs responsables : il n\'est pas prévenu', () => {
+  const r = create({owner: 'a', owners: ['a', 'b']});
+  assert.deepEqual(r.filter(m => m.to !== 'all').map(m => m.to[0]), ['b']);
+  assert.match(r[0].body, /avec Adao/);
+  assert.deepEqual(r.find(m => m.to === 'all').except, ['a', 'b']);
+});
+test('responsable ajouté plus tard à une tâche : seul le nouveau est prévenu', () => {
+  const r = n.planTask({owner: 'a', title: 'T'}, {title: 'T', owner: 'a', owners: ['a', 'b'], by: 'a', status: 'todo'}, nameOf);
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].to, ['b']);
+  assert.match(r[0].body, /avec Adao/);
+  assert.equal(n.planTask({owners: ['a', 'b'], title: 'T'}, {title: 'T', owner: 'a', owners: ['a', 'b'], by: 'a', status: 'doing'}, nameOf).length, 0);
+});
+test('rappel d\'une tâche à plusieurs responsables : tous prévenus', () => {
+  const T = 1000000000000;
+  const r = n.planReminder({title: 'x', owner: 'a', owners: ['a', 'c'], remindAt: T - 1000, status: 'todo'}, T);
+  assert.deepEqual(r[0].to, ['a', 'c']);
+});
+test('ownersOf : ancien champ owner, doublons et valeurs vides ignorés', () => {
+  assert.deepEqual(n.ownersOf({owner: 'a'}), ['a']);
+  assert.deepEqual(n.ownersOf({owner: 'a', owners: ['b', 'b', '', 3]}), ['b']);
+  assert.deepEqual(n.ownersOf({owner: ''}), []);
+  assert.deepEqual(n.ownersOf(null), []);
+});
