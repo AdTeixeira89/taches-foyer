@@ -136,4 +136,22 @@ test('veille d\'événement : envoyée une seule fois, à la bonne personne ou �
   await fns.sendEventReminders.run({});
   assert.equal(state.sent.length, 2, 'pas de doublon si la fonction repasse');
 });
+test('tâches en retard : une seule fois par date limite, au responsable, avec le lien de la tâche', async () => {
+  reset();
+  const today = notifyLib().ymdInZone(Date.now(), 'Europe/Paris'), yest = notifyLib().addDaysYmd(today, -1);
+  state.tasks = [
+    {id: 't1', code: CODE, data: {title: 'Linge', owner: 'b', status: 'todo', due: yest}},
+    {id: 't2', code: CODE, data: {title: 'Finie', owner: 'a', status: 'done', due: yest}},
+    {id: 't3', code: CODE, data: {title: 'Aujourd\'hui', owner: 'a', status: 'todo', due: today}},
+    {id: 't4', code: CODE, parent: 'autre', data: {title: 'Ailleurs', owner: 'a', status: 'todo', due: yest}}];
+  await fns.sendOverdue.run({});
+  assert.equal(state.sent.length, 1);
+  assert.deepEqual(state.sent[0].tokens, ['tok-b', 'tok-b2']);
+  assert.equal(state.sent[0].webpush.fcmOptions.link, 'https://adteixeira89.github.io/taches-foyer/?retard=t1');
+  await fns.sendOverdue.run({});
+  assert.equal(state.sent.length, 1, 'pas de doublon le lendemain matin');
+  state.tasks[0].data.due = notifyLib().addDaysYmd(today, -2);
+  await fns.sendOverdue.run({});
+  assert.equal(state.sent.length, 2, 'une nouvelle date limite dépassée est de nouveau signalée');
+});
 function notifyLib(){ return require('./notify'); }

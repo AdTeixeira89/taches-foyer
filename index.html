@@ -112,6 +112,11 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 .meta{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:12px;color:var(--muted);margin-top:1px}
 .tag{color:var(--primary)}
 .late{color:var(--late)}
+.latel{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}
+.latel:first-of-type{border-top:0}
+.latel .lt{min-width:0}.latel .lt b{display:block;overflow:hidden;text-overflow:ellipsis}
+.latel .lt span{color:var(--late);font-size:13px}
+.late-opts{display:grid;gap:8px;margin:4px 0 12px}
 .task.done .title{color:var(--done);text-decoration:line-through}
 .task.done .meta{color:var(--done)}
 .assign{display:flex;gap:4px;padding-top:5px}
@@ -1266,7 +1271,7 @@ function renderAll(){
   renderChrome();
   const r = {home: renderHome, tasks: renderTasks, fun: renderChallenges, wheel: renderWheel, bonus: renderBonus, family: renderFamily, history: renderHistory, cal: renderCal};
   r[ui.view]();
-  finalizeWeeks(); maybeCelebrate();
+  finalizeWeeks(); maybeCelebrate(); openDeepLate();
 }
 function setView(v){ ui.view = v; savePrefs(); renderAll(); window.scrollTo(0, 0); }
 
@@ -1461,6 +1466,41 @@ async function completeTask(t, whoList){
   popDone(pts, fresh.length > 1 ? 'Bravo ' + namesOf(fresh) + ' : ' + pts + ' point' + (pts > 1 ? 's' : '') + ' chacun !' : pick(DONE_MSGS), extra, lvInfo);
   if (big) { confetti(); tone([[523,.12],[659,.12],[784,.12],[1046,.26]]); }
   else tone([[660,.12],[880,.16]]);
+}
+
+/* ---------- tâche en retard : est-elle faite (et par qui), ou on repousse la date ---------- */
+const lateTasksOf = p => state.tasks.filter(t => t.status !== 'done' && validDate(t.due) && t.due < todayStr() && (!ownersOf(t).length || isOwner(t, p))).sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0);
+function lateSheet(t){
+  openSheet('Cette tâche est en retard',
+    '<p class="big" style="margin:0 0 4px">« ' + esc(t.title) + ' »</p>' +
+    '<p class="help late">Prévue le ' + esc(fmtDayLong.format(parseYmd(t.due))) + '. Est-elle faite ?</p>' +
+    '<div class="late-opts"><button type="button" class="btn primary" data-action="lateDone" data-id="' + esc(t.id) + '">Oui, elle est faite</button>' +
+    '<button type="button" class="btn" data-action="lateSnooze" data-id="' + esc(t.id) + '">Pas encore : repousser la date</button>' +
+    '<button type="button" class="btn quiet" data-action="closeSheet">Plus tard</button></div>', async () => false);
+}
+function snoozeSheet(t){
+  const today = new Date(), opts = [['1', 'Demain'], ['3', 'Dans 3 jours'], ['7', 'Dans 1 semaine']];
+  openSheet('Repousser la date',
+    '<p class="help">« ' + esc(t.title) + ' »</p>' +
+    '<div class="fld">' + radios('snz', opts.map(o => [ymd(addDays(today, +o[0])), o[1] + ' · ' + fmtDM.format(addDays(today, +o[0]))]), ymd(addDays(today, 1))) + '</div>' +
+    '<label class="fld"><span>Ou choisir une date</span><input type="date" name="other" min="' + ymd(addDays(today, 1)) + '"></label>' +
+    '<div class="sheet-actions"><button type="submit" class="btn primary">Repousser</button></div>',
+    async f => {
+      const d = validDate(val(f, 'other')) ? val(f, 'other') : radio(f, 'snz');
+      if (!validDate(d) || d <= todayStr()) { toast('Choisis une date à venir.'); return false; }
+      return run(() => store.update('tasks', t.id, {due: d})).then(ok => { if (ok) toast('Nouvelle date : ' + fmtShort.format(parseYmd(d)) + '.'); return ok; });
+    });
+}
+// un lien de notification (?retard=<tâche>) ouvre directement la question
+let deepLate = (() => { try { return new URLSearchParams(location.search).get('retard') || ''; } catch(e) { return ''; } })();
+function openDeepLate(){
+  if (!deepLate || !state.loaded.tasks || sheet) return;
+  const id = deepLate; deepLate = '';
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch(e) {}
+  const t = byId('tasks', id);
+  if (!t) return;
+  if (t.status === 'done') toast('Cette tâche est déjà terminée.');
+  else if (validDate(t.due) && t.due < todayStr() && state.canWrite) lateSheet(t);
 }
 
 /* clôture des semaines passées : historique conservé, sans doublon (id = lundi de la semaine) */
@@ -1939,6 +1979,9 @@ function renderHome(){
     '<div class="xp">' + xpBar(lv) + '<p>' + lv.into + ' / ' + lv.need + ' points vers le niveau ' + (lv.level + 1) + '</p></div></section>';
 
   h += '<div class="home-grid"><div>';
+  const lateL = state.canWrite ? lateTasksOf(me) : [];
+  if (lateL.length) h += '<section class="card"><header class="card-h">' + ico('bell', 20) + '<h2>À confirmer</h2><span class="muted">' + lateL.length + ' en retard</span></header>' +
+    lateL.slice(0, 5).map(x => '<div class="latel"><span class="lt"><b>' + esc(x.title) + '</b><span>Prévue ' + esc(relDate(x.due).toLowerCase()) + '</span></span><button type="button" class="btn small primary" data-action="lateAsk" data-id="' + esc(x.id) + '">Fait ?</button></div>').join('') + '</section>';
   h += '<section class="card"><header class="card-h">' + IC.flame(20) + '<h2>Aujourd’hui</h2><span class="muted">' + doneToday + ' terminée' + (doneToday > 1 ? 's' : '') + ' sur ' + tot + '</span></header>' +
     (tot ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><b style="width:' + pct + '%"></b></div>' : '') +
     (dueNow.length ? '<ul class="list">' + dueNow.slice(0, 4).map(x => taskCard(x, false)).join('') + '</ul>' + (dueNow.length > 4 ? '<p class="muted">et ' + (dueNow.length - 4) + ' autre' + (dueNow.length > 5 ? 's' : '') + '</p>' : '')
@@ -2026,6 +2069,9 @@ document.addEventListener('click', ev => {
     case 'addMemberRow': addMemberRow(); break;
     case 'notifOn': push.enable().then(refreshNotifBox); break;
     case 'notifOff': push.disable().then(refreshNotifBox); break;
+    case 'lateAsk': { const t = byId('tasks', id); if (t && t.status !== 'done' && state.canWrite) lateSheet(t); break; }
+    case 'lateDone': { const t = byId('tasks', id); closeSheet(); if (t) { const o = ownersOf(t).filter(x => activePeople().indexOf(x) >= 0); askWho(t, o.length ? o : [meOf()]); } break; }
+    case 'lateSnooze': { const t = byId('tasks', id); if (t) snoozeSheet(t); break; }
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
     case 'clearRemind': { const f = $('#sheetForm'); if (f && f.elements.remindDate) { f.elements.remindDate.value = ''; f.elements.remindTime.value = ''; } break; }
     case 'closeSheet': closeSheet(); break;

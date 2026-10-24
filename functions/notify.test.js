@@ -202,3 +202,26 @@ test('ownersOf : ancien champ owner, doublons et valeurs vides ignorés', () => 
   assert.deepEqual(n.ownersOf({owner: ''}), []);
   assert.deepEqual(n.ownersOf(null), []);
 });
+
+test('date limite dépassée : le responsable est interrogé, lien direct vers la tâche', () => {
+  const r = n.planOverdue({title: 'Linge', owner: 'b', due: '2026-10-12', status: 'todo'}, '2026-10-13', 't1');
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].to, ['b']);
+  assert.match(r[0].title, /en retard/);
+  assert.match(r[0].body, /« Linge » était prévue le lundi 12 octobre/);
+  assert.match(r[0].body, /qui l’a faite|repousse/);
+  assert.equal(r[0].link, '?retard=t1');
+});
+test('date limite dépassée : plusieurs responsables, ou tout le monde si « à prendre »', () => {
+  assert.deepEqual(n.planOverdue({title: 'x', owner: 'a', owners: ['a', 'c'], due: '2026-10-12'}, '2026-10-13', 't')[0].to, ['a', 'c']);
+  assert.equal(n.planOverdue({title: 'x', owner: '', due: '2026-10-12'}, '2026-10-13', 't')[0].to, 'all');
+});
+test('date limite dépassée : rien si faite, pas encore passée, trop ancienne ou sans date', () => {
+  const t = {title: 'x', owner: 'a', due: '2026-10-12', status: 'todo'};
+  assert.equal(n.planOverdue(Object.assign({}, t, {status: 'done'}), '2026-10-13', 't').length, 0);
+  assert.equal(n.planOverdue(t, '2026-10-12', 't').length, 0, 'le jour même : pas encore en retard');
+  assert.equal(n.planOverdue(t, '2026-10-19', 't').length, 1);
+  assert.equal(n.planOverdue(t, '2026-10-20', 't').length, 0, 'plus de 7 jours : on n\'insiste plus');
+  assert.equal(n.planOverdue(Object.assign({}, t, {due: ''}), '2026-10-13', 't').length, 0);
+  assert.equal(n.planOverdue(null, '2026-10-13', 't').length, 0);
+});

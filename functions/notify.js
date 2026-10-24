@@ -55,6 +55,18 @@ function planReminder(task, now){
   return [{to: owners.length ? owners : 'all', except: '', title: 'Rappel', body: owners.length ? 'C’est l’heure : ' + title : 'Une tâche à prendre : ' + title, tag: 'remind-' + (task.title || '')}];
 }
 
+// date limite dépassée : le matin suivant, on demande aux responsables (ou à tous si « à prendre ») si la tâche est faite, et par qui, ou de repousser la date.
+// Un message par tâche et par date limite (le lien ouvre directement la question dans l'app) ; au-delà de OVERDUE_DAYS jours, on n'insiste plus.
+const OVERDUE_DAYS = 7;
+function planOverdue(task, today, id){
+  if (!task || task.status === 'done' || !/^\d{4}-\d{2}-\d{2}$/.test(task.due || '') || !/^\d{4}-\d{2}-\d{2}$/.test(today || '')) return [];
+  if (task.due >= today || task.due < addDaysYmd(today, -OVERDUE_DAYS)) return [];
+  const owners = ownersOf(task), when = dateLabel(task.due);
+  return [{to: owners.length ? owners : 'all', except: '', title: 'Tâche en retard : est-elle faite ?',
+    body: quote(task.title) + ' était prévue ' + (when ? 'le ' + when : 'avant aujourd’hui') + '. Dis qui l’a faite, ou repousse la date.',
+    tag: 'overdue-' + (id || task.title || ''), link: id ? '?retard=' + encodeURIComponent(id) : ''}];
+}
+
 // jokers : demande d'échange ou d'aide, puis réponse
 function planJoker(before, after, nameOf){
   if (!after) return [];
@@ -128,4 +140,4 @@ function pickDevices(devices, msg){
   return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
-module.exports = {ownersOf, clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, TIMEZONE};
+module.exports = {ownersOf, clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planOverdue, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, OVERDUE_DAYS, TIMEZONE};

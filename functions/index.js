@@ -26,7 +26,7 @@ async function deliver(code, messages){
     const res = await getMessaging().sendEachForMulticast({
       tokens,
       notification: {title: m.title, body: m.body},
-      webpush: {fcmOptions: {link: SITE}, notification: {icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}}
+      webpush: {fcmOptions: {link: SITE + (m.link || '')}, notification: {icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}}
     });
     res.responses.forEach((r, i) => { if (!r.success && r.error && DEAD.indexOf(r.error.code) >= 0) dead.add(tokens[i]); });
   }
@@ -79,6 +79,21 @@ exports.sendEventReminders = onSchedule({schedule: '0 18 * * *', timeZone: notif
     if (!code) continue;
     const messages = notify.planEventTomorrow(d.data());
     if (!messages.length || !(await claim(db, code, 'event_' + d.id + '_' + tomorrow))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
+  }
+  for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
+});
+
+// Tâches en retard : chaque matin à 9 h, on demande si la tâche dont la date limite est passée est faite (une seule fois par date limite).
+exports.sendOverdue = onSchedule({schedule: '0 9 * * *', timeZone: notify.TIMEZONE, region: REGION, timeoutSeconds: 120}, async () => {
+  const db = getFirestore(), today = notify.ymdInZone(Date.now(), notify.TIMEZONE);
+  const snap = await db.collectionGroup('tasks').where('due', '>=', notify.addDaysYmd(today, -notify.OVERDUE_DAYS)).where('due', '<', today).get();
+  const byCode = {};
+  for (const d of snap.docs) {
+    const code = homeCode(d);
+    if (!code) continue;
+    const task = d.data(), messages = notify.planOverdue(task, today, d.id);
+    if (!messages.length || !(await claim(db, code, 'overdue_' + d.id + '_' + task.due))) continue;
     (byCode[code] = byCode[code] || []).push(...messages);
   }
   for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);

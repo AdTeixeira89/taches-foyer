@@ -16,6 +16,8 @@ Au départ, la famille compte trois profils (Adao, Maman, Fille). Pour en ajoute
 
 **Plusieurs participants** : une tâche peut être confiée à plusieurs personnes (cases « Responsable(s) »). À la fin, l'app demande qui a participé ; chaque participant reçoit les points complets, une seule fois par tâche. Le défi de la famille compte la tâche une seule fois.
 
+**Tâches en retard** : quand la date limite d'une tâche est passée, l'accueil affiche « À confirmer » avec un bouton « Fait ? » : on indique qui l'a faite (points attribués) ou on repousse la date. En mode Firebase avec notifications, chaque matin à 9 h (heure de Paris), le responsable (ou toute la famille si la tâche est « à prendre ») reçoit une alerte qui ouvre directement cette question, une seule fois par date limite.
+
 **Actualiser** : sur téléphone, tire la page vers le bas depuis le haut de l'écran (ou Paramètres > Actualiser l'app) pour charger la dernière version.
 
 ## Avoir les mêmes données pour toute la famille (lien GitHub)
