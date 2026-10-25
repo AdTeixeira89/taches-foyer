@@ -578,7 +578,7 @@ function validDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
 const PREF_KEY = 'famille.prefs.v1';
 let ui = {view:'home', meSet:false, hiddenCols:{}, hideDone:true, status:'all', calMode:'month', me:'a', fx:{anim:true, sound:false}, celebrated:{}, missionShift:{}};
 try { const raw = localStorage.getItem(PREF_KEY); if (raw) ui = Object.assign(ui, JSON.parse(raw)); } catch(e) {}
-ui.fx = Object.assign({anim:true, sound:false}, ui.fx || {}); ui.celebrated = ui.celebrated || {}; ui.missionShift = ui.missionShift || {};
+ui.fx = Object.assign({anim:true, sound:true}, ui.fx || {}); if (!ui.fx.chosen) ui.fx.sound = true;  // sons rigolos par défaut, tant que la personne n'a pas fait son choix dans les Réglages ui.celebrated = ui.celebrated || {}; ui.missionShift = ui.missionShift || {};
 function savePrefs(){ try { localStorage.setItem(PREF_KEY, JSON.stringify(ui)); } catch(e) {} }
 
 /* ---------- état ---------- */
@@ -719,6 +719,7 @@ const isAdmin = () => lockOk() && state.codes.admin === ui.lock.who;
 const whoOfCode = c => { const k = cleanCode(c); return Object.keys(codesOf()).filter(id => codesOf()[id] === k)[0] || ''; };
 function setLock(who, c){ ui.lock = {fam: getFamilyCode(), who, c}; ui.me = who; ui.meSet = true; savePrefs(); }
 let ensuring = false;
+let soundDemo = -1;
 async function ensureCodes(){
   if (ensuring || !isAdmin() || !state.canWrite || !store.db) return;
   const have = codesOf(), missing = everyone().filter(id => !have[id]);
@@ -1086,7 +1087,7 @@ function taskSheet(t, preOwner){
     }
     if (isNew) {
       const data = withRemind(withOwners({title, status:'todo', due, pts, createdAt: Date.now(), by: meOf()}, owners), remindAt);
-      return run(() => store.set('tasks', uid(), data));
+      return run(() => store.set('tasks', uid(), data)).then(ok => { if (ok) sfx('pop'); return ok; });
     }
     const status = radio(f, 'status') || t.status;
     const fields = {title, pts, due};
@@ -1334,7 +1335,8 @@ function settingsSheet(addNew){
     '<div class="seg" style="margin:-6px 0 14px">' + ['Soirée pizza', 'Jeu de société', 'Sortie familiale'].map(r => '<button type="button" class="chip" data-action="rewardPreset" data-t="' + r + '">' + r + '</button>').join('') + '</div>' +
     '<p class="help" style="margin-bottom:4px">Sur cet appareil :</p>' +
     '<label class="check"><input type="checkbox" name="animOn"' + (ui.fx.anim ? ' checked' : '') + '><span>Animations et confettis</span></label>' +
-    '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons</span></label>' +
+    '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons rigolos</span></label>' +
+    '<p style="margin:0 0 8px"><button type="button" class="btn small" data-action="soundTest">Écouter un exemple</button></p>' +
     '<p style="margin:10px 0 0"><button type="button" class="btn small" data-action="reload">Actualiser l’app</button> <span class="help">Sur téléphone, tu peux aussi tirer la page vers le bas.</span></p>' +
     (push.configured() ? '<div class="fld" id="notifBox" style="margin-top:10px">' + notifBoxHtml() + '</div>' : '') +
     (store.backend === 'firebase'
@@ -1345,7 +1347,7 @@ function settingsSheet(addNew){
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button></div>';
   openSheet('Réglages', body, async f => {
     const names = {a: val(f,'n_a') || 'Parent 1', b: val(f,'n_b') || 'Parent 2', c: val(f,'n_c') || 'Enfant'};
-    ui.fx = {anim: f.elements.animOn.checked, sound: f.elements.soundOn.checked}; savePrefs();
+    ui.fx = {anim: f.elements.animOn.checked, sound: f.elements.soundOn.checked, chosen: true}; savePrefs();
     const goalV = Math.min(99, Math.max(1, parseInt(val(f, 'goal'), 10) || 20));
     const avatars = {}; BASE_PEOPLE.forEach(p => { avatars[p] = radio(f, 'av_' + p) || state.settings.avatars[p]; });
     const members = $$('.mrow', f).map((row, i) => { const id = row.dataset.id; return {id, name: val(f, 'mn_' + id) || 'Membre ' + (i + 1), avatar: radio(f, 'mav_' + id) || DEFAULT_EXTRA_AVATARS[i % DEFAULT_EXTRA_AVATARS.length], on: f.elements['mon_' + id].checked}; });
@@ -1468,22 +1470,67 @@ function curStreak(who){
 /* animations et sons (désactivables) */
 const fxOn = () => ui.fx.anim && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 let audioCtx = null;
+const getAudio = () => { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch(e) { audioCtx = null; } return audioCtx; };
+// le navigateur n'autorise le son qu'après un geste : on réveille l'audio dès le premier appui
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (ui.fx.sound) getAudio(); }, {passive: true}));
+// notes de la mélodie : [fréquence, durée] (ancien format, conservé)
 function tone(seq){
   if (!ui.fx.sound) return;
+  let at = 0;
+  playVoices(seq.map(n => { const v = {f: n[0], d: n[1], at, v: .12}; at += n[1] * .8; return v; }));
+}
+// une voix : f = fréquence, to = glissando vers, d = durée, at = départ (s), type = forme d'onde, v = volume, vib = vibrato (Hz)
+function playVoices(voices){
+  const ac = getAudio();
+  if (!ac) return;
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    let t = audioCtx.currentTime;
-    seq.forEach(n => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.type = 'sine'; o.frequency.value = n[0];
+    const t0 = ac.currentTime + 0.01;
+    voices.forEach(n => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = t0 + (n.at || 0), v = n.v || .12, d = n.d || .1;
+      o.type = n.type || 'sine';
+      o.frequency.setValueAtTime(n.f, t);
+      if (n.to) o.frequency.exponentialRampToValueAtTime(n.to, t + d);
+      if (n.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = n.vib; lg.gain.value = n.f * .03; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + d + .05); }
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + n[1]);
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(t); o.stop(t + n[1] + 0.02);
-      t += n[1] * 0.8;
+      g.gain.exponentialRampToValueAtTime(v, t + Math.min(.02, d / 3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t); o.stop(t + d + .03);
     });
   } catch(e) {}
+}
+// sons rigolos : un par étape réussie (boing, ta-da, pièce magique, fanfare…)
+const SFX = {
+  pop:    [{f: 420, to: 1100, d: .1, type: 'sine', v: .2}, {f: 1100, to: 700, d: .07, at: .09, type: 'sine', v: .12}],                       // tâche créée : « bloup »
+  boing:  [{f: 180, to: 620, d: .18, type: 'triangle', v: .22, vib: 28}, {f: 620, to: 260, d: .16, at: .17, type: 'triangle', v: .16, vib: 22}],  // tâche commencée : ressort
+  back:   [{f: 520, to: 220, d: .16, type: 'triangle', v: .16}],                                                                             // retour en arrière : « ouuuh » doux
+  done:   [{f: 523, d: .1, type: 'square', v: .06}, {f: 659, d: .1, at: .09, type: 'square', v: .06}, {f: 784, d: .1, at: .18, type: 'square', v: .06},
+           {f: 1046, d: .3, at: .27, type: 'square', v: .07}, {f: 1568, to: 2093, d: .25, at: .36, type: 'sine', v: .08}],                  // tâche terminée : ta-da
+  big:    [{f: 392, d: .12, type: 'sawtooth', v: .06}, {f: 523, d: .12, at: .1, type: 'sawtooth', v: .06}, {f: 659, d: .12, at: .2, type: 'sawtooth', v: .06},
+           {f: 784, d: .12, at: .3, type: 'sawtooth', v: .06}, {f: 1046, d: .5, at: .4, type: 'sawtooth', v: .07, vib: 6}, {f: 1318, d: .5, at: .4, type: 'sine', v: .07},
+           {f: 600, to: 2400, d: .5, at: .45, type: 'sine', v: .05}],                                                                          // grande réussite : fanfare + étincelles
+  joker:  [{f: 988, d: .07, type: 'square', v: .07}, {f: 1319, d: .45, at: .07, type: 'square', v: .07}, {f: 500, to: 2200, d: .4, at: .2, type: 'sine', v: .07},
+           {f: 1568, d: .12, at: .5, type: 'sine', v: .07}, {f: 2093, d: .3, at: .6, type: 'sine', v: .07}],                                // joker gagné : pièce + glissando magique
+  win:    [{f: 659, d: .12, type: 'triangle', v: .12}, {f: 784, d: .12, at: .1, type: 'triangle', v: .12}, {f: 988, d: .12, at: .2, type: 'triangle', v: .12},
+           {f: 1319, d: .4, at: .3, type: 'triangle', v: .14, vib: 7}],                                                                      // lot gagné
+  yay:    [{f: 440, to: 660, d: .1, type: 'triangle', v: .14}, {f: 660, to: 990, d: .12, at: .1, type: 'triangle', v: .14}, {f: 880, d: .2, at: .22, type: 'sine', v: .1}],  // merci / accord
+  whoosh: [{f: 300, to: 1400, d: .22, type: 'sawtooth', v: .04}, {f: 1400, to: 500, d: .2, at: .2, type: 'sine', v: .06}],                      // joker envoyé
+  champ:  [{f: 392, to: 440, d: .2, type: 'sawtooth', v: .07, vib: 8}, {f: 392, d: .12, at: .22, type: 'sawtooth', v: .07}, {f: 523, d: .12, at: .36, type: 'sawtooth', v: .07},
+           {f: 659, d: .12, at: .5, type: 'sawtooth', v: .07}, {f: 784, d: .6, at: .64, type: 'sawtooth', v: .08, vib: 7}, {f: 1046, d: .6, at: .64, type: 'sine', v: .08}],  // champion : trompette
+  tick:   [{f: 1800, to: 900, d: .03, type: 'square', v: .05}]                                                                                // roulette : cliquetis
+};
+function sfx(name, force){
+  if (!force && !ui.fx.sound) return;
+  const v = SFX[name];
+  if (v) playVoices(v);
+}
+// cliquetis de la roulette : ralentit comme la roue (sur la durée de l'animation)
+function spinTicks(ms, n){
+  if (!ui.fx.sound) return;
+  for (let i = 1; i <= n; i++) {
+    const frac = 1 - Math.pow(1 - i / n, 1 / 3);
+    setTimeout(() => sfx('tick'), Math.round(frac * ms));
+  }
 }
 function confetti(){
   if (!fxOn()) return;
@@ -1532,6 +1579,7 @@ function popDone(pts, msg, extra, lv){
 /* terminer une tâche : chaque participant reçoit ses points une seule fois (un point par personne et par tâche) */
 function setStatus(t, next){
   if (next === 'done') return finishTask(t);
+  sfx(next === 'doing' ? 'boing' : 'back');
   return run(() => store.update('tasks', t.id, {status: next}));
 }
 function finishTask(t){
@@ -1573,8 +1621,8 @@ async function completeTask(t, whoList){
   else if (goalHit) extra = 'Défi de la famille atteint !';
   const big = pts >= 3 || newB.length > 0 || goalHit || lvUp;
   popDone(pts, fresh.length > 1 ? 'Bravo ' + namesOf(fresh) + ' : ' + pts + ' point' + (pts > 1 ? 's' : '') + ' chacun !' : pick(DONE_MSGS), extra, lvInfo);
-  if (big) { confetti(); tone([[523,.12],[659,.12],[784,.12],[1046,.26]]); }
-  else tone([[660,.12],[880,.16]]);
+  if (big) { confetti(); sfx('big'); }
+  else sfx('done');
 }
 
 /* ---------- tâche en retard : est-elle faite (et par qui), ou on repousse la date ---------- */
@@ -1638,7 +1686,7 @@ function celebrateChampion(wk){
     '<div class="champ">' + IC.trophy(64) + '<p class="big">' + esc(namesOf(c.list)) + '</p><p>' + esc(msg) + '</p>' +
     '<p class="muted">Merci à toute la famille : ' + total + ' points cette semaine.</p></div>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Merci !</button></div>', async () => true);
-  confetti(); tone([[523,.14],[659,.14],[784,.14],[1046,.3]]);
+  confetti(); sfx('champ');
 }
 function maybeCelebrate(){
   if (['home','family','fun'].indexOf(ui.view) < 0 || sheet || !state.loaded.points) return;
@@ -1735,7 +1783,7 @@ function jokerSheet(kind){
   openSheet(JOKERS[kind], body + '<div class="sheet-actions"><button type="submit" class="btn primary">Utiliser mon joker</button></div>', async f => {
     if (jokersLeft(me, kind) < 1) { toast('Plus de joker de ce type cette semaine.'); return false; }
     const data = Object.assign(save(f), {week: wk, at: Date.now()});
-    return run(() => store.set('jokers', uid(), data));
+    return run(() => store.set('jokers', uid(), data)).then(ok => { if (ok) sfx('whoosh'); return ok; });
   });
 }
 function jokerItems(){
@@ -2041,14 +2089,14 @@ async function doSpin(){
   const g = $('#wheelG');
   const target = Math.ceil(wheelRot / 360) * 360 + 360 * 5 + (360 - (k * (360 / PRIZES.length) + 180 / PRIZES.length));
   if (g) {
-    if (fxOn()) { g.style.transition = 'transform 4s cubic-bezier(.12,.62,.16,1)'; requestAnimationFrame(() => { g.style.transform = 'rotate(' + target + 'deg)'; }); await wait(4100); }
+    if (fxOn()) { spinTicks(4000, 26); g.style.transition = 'transform 4s cubic-bezier(.12,.62,.16,1)'; requestAnimationFrame(() => { g.style.transform = 'rotate(' + target + 'deg)'; }); await wait(4100); }
     else { g.style.transition = 'none'; g.style.transform = 'rotate(' + target + 'deg)'; }
   }
   wheelRot = target % 360;
   spinning = false; revealing.delete(id);
   renderAll();
   resultSheet(prize);
-  confetti(); tone([[523,.12],[659,.12],[784,.12],[1046,.28]]);
+  confetti(); sfx(prize.id === 'joker' ? 'joker' : 'win');
 }
 function resultSheet(prize){
   openSheet('Résultat de la roue',
@@ -2223,14 +2271,14 @@ document.addEventListener('click', ev => {
     case 'celebrate': celebrateChampion(curWeek()); break;
     case 'pactNew': if (state.canWrite) pactSheet(el.dataset.wk); break;
     case 'pactEdit': if (state.canWrite) pactSheet(el.dataset.wk); break;
-    case 'pactDone': { const pc = byId('pacts', el.dataset.wk); if (pc) run(() => store.update('pacts', pc.id, {done: !pc.done})); break; }
+    case 'pactDone': { const pc = byId('pacts', el.dataset.wk); if (pc) run(() => store.update('pacts', pc.id, {done: !pc.done})).then(ok => { if (ok && !pc.done) sfx('win'); }); break; }
     case 'preset': { const f = $('#sheetForm'); if (f && f.elements.reward) { f.elements.reward.value = el.dataset.t; const r = f.querySelector('input[name=kind][value="' + el.dataset.k + '"]'); if (r) r.checked = true; } break; }
     case 'rewardPreset': { const f = $('#sheetForm'); if (f && f.elements.collReward) f.elements.collReward.value = el.dataset.t; break; }
-    case 'missionDone': { const d = todayStr(), md = byId('missions', d), done = Object.assign({}, (md && md.done) || {}); done[meOf()] = missionIdx(); run(() => store.set('missions', d, {done})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">La maison est un peu plus douce.</p>', 2200); tone([[660,.12],[880,.16]]); } }); break; }
+    case 'missionDone': { const d = todayStr(), md = byId('missions', d), done = Object.assign({}, (md && md.done) || {}); done[meOf()] = missionIdx(); run(() => store.set('missions', d, {done})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">La maison est un peu plus douce.</p>', 2200); sfx('yay'); } }); break; }
     case 'missionShuffle': { const d = todayStr(); ui.missionShift[d] = (ui.missionShift[d] || 0) + 1; savePrefs(); renderAll(); break; }
     case 'badgeInfo': { const b = BADGES.filter(x => x.id === el.dataset.b)[0]; if (b) toast(b.name + ' : ' + b.desc + (badgesOf(meOf())[b.id] ? ' (obtenu)' : ' (à débloquer)')); break; }
     case 'jokerNew': { if (!state.canWrite) break; if (jokersLeft(meOf(), el.dataset.k) < 1) { toast('Plus de joker de ce type cette semaine.'); break; } jokerSheet(el.dataset.k); break; }
-    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.set('tasks', t.id, Object.assign(withOwners(strip(t), ownersOf(t).filter(o => o !== j.who).concat(j.to)), {by: meOf()})); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) toast('Échange accepté.'); }); break; }
+    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.set('tasks', t.id, Object.assign(withOwners(strip(t), ownersOf(t).filter(o => o !== j.who).concat(j.to)), {by: meOf()})); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) { toast('Échange accepté.'); sfx('yay'); } }); break; }
     case 'jokerRefuse': run(() => store.update('jokers', id, {status: 'refused'})); break;
     case 'jokerCancel': run(() => store.update('jokers', id, {status: 'cancelled'})); break;
     case 'helpTake': run(() => store.update('jokers', id, {status: 'accepted', helper: meOf()})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">Un coup de main, c’est précieux.</p>', 2400); tone([[660,.12],[880,.16]]); } }); break;
@@ -2238,6 +2286,7 @@ document.addEventListener('click', ev => {
     case 'spin': doSpin(); break;
     case 'menu': menuSheet(); break;
     case 'profile': profileSheet(); break;
+    case 'soundTest': { const k = Object.keys(SFX).filter(x => ['done', 'joker', 'big', 'yay', 'win', 'boing'].indexOf(x) >= 0); soundDemo = (soundDemo + 1) % k.length; sfx(k[soundDemo], true); break; }
     case 'lockOut': delete ui.lock; ui.meSet = false; savePrefs(); closeSheet(); renderAll(); break;
     case 'leaveFamily': if (window.confirm('Quitter ce foyer sur cet appareil ? Il faudra son code pour y revenir.')) { delete ui.lock; ui.meSet = false; savePrefs(); setFamilyCode(''); location.reload(); } break;
     case 'codesOn': {

@@ -10,7 +10,7 @@ La section « Idées » (avec dictée vocale) a été retirée de l'interface à
 - **Ne supprimer aucune donnée ni fonction existante.** Les nouveaux champs doivent être facultatifs (les anciennes données restent valides).
 - Ne pas changer les règles de jeu sans accord explicite : points par difficulté (1, 2, 3, 5), points attribués une seule fois par personne et par tâche (une tâche peut avoir plusieurs participants, chacun reçoit les points complets, accord explicite de la famille), aucun point jamais retiré, classement bienveillant, jokers (un de chaque par semaine, échange avec accord), roulette (5 segments égaux, un ticket tous les 10 points, un tour par semaine et par personne).
 - Ne pas simuler une sauvegarde ou une synchronisation. Ne jamais mettre de fausses récompenses dans les données réelles.
-- Interface en français, sobre et lisible sur téléphone, tablette et ordinateur. Animations et sons désactivables.
+- Interface en français, sobre et lisible sur téléphone, tablette et ordinateur. Animations et sons désactivables. Les sons (`sfx()`, table `SFX`, synthèse WebAudio, aucun fichier) sont activés par défaut tant que la personne n'a pas choisi dans les Réglages (`ui.fx.chosen`).
 - Échapper tout texte affiché (`esc()`), car les données sont partagées entre plusieurs personnes.
 
 ## Données
