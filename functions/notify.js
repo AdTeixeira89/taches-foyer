@@ -8,7 +8,7 @@ const quote = s => '« ' + clip(s) + ' »';
 
 // prénoms : a, b, c puis les membres ajoutés (settings/family.members)
 function nameResolver(settings){
-  const names = Object.assign({a: 'Adao', b: 'Maman', c: 'Fille'}, (settings && settings.names) || {});
+  const names = Object.assign({a: 'Parent 1', b: 'Parent 2', c: 'Enfant'}, (settings && settings.names) || {});
   ((settings && settings.members) || []).forEach(m => { if (m && m.id) names[m.id] = m.name || 'Membre'; });
   return k => names[k] || 'Quelqu’un';
 }

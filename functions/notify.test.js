@@ -8,7 +8,7 @@ test('prénoms : base, membres ajoutés, inconnu', () => {
   assert.equal(nameOf('a'), 'Adao');
   assert.equal(nameOf('mx1'), 'Mamie');
   assert.equal(nameOf('zzz'), 'Quelqu’un');
-  assert.equal(n.nameResolver(null)('b'), 'Maman');
+  assert.equal(n.nameResolver(null)('b'), 'Parent 2');
 });
 
 const NOW = 1000000000000, fresh = {createdAt: NOW - 1000};
