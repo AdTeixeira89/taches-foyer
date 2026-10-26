@@ -4,6 +4,7 @@
    est écrit, on calcule qui prévenir (notify.js) puis on envoie aux téléphones enregistrés sous
    foyers/<code>/devices (jeton + profil choisi sur l'appareil). */
 const {onDocumentWritten} = require('firebase-functions/v2/firestore');
+const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
@@ -25,7 +26,7 @@ async function deliver(code, messages){
     const res = await getMessaging().sendEachForMulticast({
       tokens,
       notification: {title: m.title, body: m.body},
-      webpush: {fcmOptions: {link: SITE}, notification: {icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}}
+      webpush: {fcmOptions: {link: SITE + (m.link || '')}, notification: {icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}}
     });
     res.responses.forEach((r, i) => { if (!r.success && r.error && DEAD.indexOf(r.error.code) >= 0) dead.add(tokens[i]); });
   }
@@ -45,6 +46,58 @@ function watch(path, plan){
     if (messages.length) await deliver(code, messages);
   });
 }
+
+// Un document foyers/<code>/reminderLog/<clé> est créé avant chaque envoi planifié : il ne part jamais deux fois.
+const homeCode = d => { const home = d.ref.parent.parent; return home && home.parent && home.parent.id === 'foyers' && /^[A-Z0-9]{12}$/.test(home.id) ? home.id : null; };
+async function claim(db, code, key){
+  try { await db.doc('foyers/' + code + '/reminderLog/' + key).create({at: Date.now()}); return true; }
+  catch (e) { if (e && (e.code === 6 || /already exists/i.test(String(e.message || '')))) return false; throw e; }
+}
+
+// Rappels de tâches : chaque minute, on cherche les tâches dont l'heure de rappel vient de passer.
+exports.sendReminders = onSchedule({schedule: 'every 1 minutes', region: REGION, timeoutSeconds: 120}, async () => {
+  const db = getFirestore(), now = Date.now();
+  const snap = await db.collectionGroup('tasks').where('remindAt', '>=', now - notify.REMIND_WINDOW_MS).where('remindAt', '<=', now).get();
+  const byCode = {};
+  for (const d of snap.docs) {
+    const code = homeCode(d);
+    if (!code) continue;
+    const task = d.data(), messages = notify.planReminder(task, now);
+    if (!messages.length || !(await claim(db, code, d.id + '_' + task.remindAt))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
+  }
+  for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
+});
+
+// Événements du calendrier : chaque soir à 18 h, on prévient pour le lendemain.
+exports.sendEventReminders = onSchedule({schedule: '0 18 * * *', timeZone: notify.TIMEZONE, region: REGION, timeoutSeconds: 120}, async () => {
+  const db = getFirestore(), tomorrow = notify.addDaysYmd(notify.ymdInZone(Date.now(), notify.TIMEZONE), 1);
+  const snap = await db.collectionGroup('events').where('date', '==', tomorrow).get();
+  const byCode = {};
+  for (const d of snap.docs) {
+    const code = homeCode(d);
+    if (!code) continue;
+    const messages = notify.planEventTomorrow(d.data());
+    if (!messages.length || !(await claim(db, code, 'event_' + d.id + '_' + tomorrow))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
+  }
+  for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
+});
+
+// Tâches en retard : chaque matin à 9 h, on demande si la tâche dont la date limite est passée est faite (une seule fois par date limite).
+exports.sendOverdue = onSchedule({schedule: '0 9 * * *', timeZone: notify.TIMEZONE, region: REGION, timeoutSeconds: 120}, async () => {
+  const db = getFirestore(), today = notify.ymdInZone(Date.now(), notify.TIMEZONE);
+  const snap = await db.collectionGroup('tasks').where('due', '>=', notify.addDaysYmd(today, -notify.OVERDUE_DAYS)).where('due', '<', today).get();
+  const byCode = {};
+  for (const d of snap.docs) {
+    const code = homeCode(d);
+    if (!code) continue;
+    const task = d.data(), messages = notify.planOverdue(task, today, d.id);
+    if (!messages.length || !(await claim(db, code, 'overdue_' + d.id + '_' + task.due))) continue;
+    (byCode[code] = byCode[code] || []).push(...messages);
+  }
+  for (const code of Object.keys(byCode)) await deliver(code, byCode[code]);
+});
 
 exports.notifyTask = watch('foyers/{code}/tasks/{id}', notify.planTask);
 exports.notifyJoker = watch('foyers/{code}/jokers/{id}', notify.planJoker);

@@ -12,7 +12,17 @@ Activation : Settings, Pages, Deploy from a branch, branche `main`, dossier `/ (
 
 ## Ajouter des membres
 
-Au départ, la famille compte trois profils (Adao, Maman, Fille). Pour en ajouter (grands-parents, cousins, autre enfant…) : **Famille > + Ajouter un membre**, ou **Paramètres > Autres membres**, ou dans « Qui utilise cet appareil ? ». Chaque membre a son prénom, son avatar et sa couleur, et joue comme les autres : colonne de tâches, points, classement, jokers et un tour de roulette par semaine. Jusqu'à 8 membres au total. Décocher « Afficher ce membre » le masque sans rien effacer (ses points et son historique restent).
+Au départ, la famille compte trois profils aux noms de démonstration (Parent 1, Parent 2, Enfant) : chacun les remplace par les vrais prénoms dans les Réglages. Pour en ajouter (grands-parents, cousins, autre enfant…) : **Famille > + Ajouter un membre**, ou **Paramètres > Autres membres**, ou dans « Qui utilise cet appareil ? ». Chaque membre a son prénom, son avatar et sa couleur, et joue comme les autres : colonne de tâches, points, classement, jokers et un tour de roulette par semaine. Jusqu'à 8 membres au total. Décocher « Afficher ce membre » le masque sans rien effacer (ses points et son historique restent).
+
+**Un code personnel par membre (version familiale)** : quand on crée un foyer, le créateur devient l'organisateur (profil 1) et chaque profil reçoit un code personnel de 6 caractères, visible dans Réglages > Codes personnels (l'organisateur seul voit tous les codes ; chaque membre ne voit que le sien). Sur un nouveau téléphone, on entre le code du foyer puis son code personnel : l'appareil reste relié à ce profil et il est impossible de passer sur celui d'un autre (le profil affiché est « Mon profil »). L'organisateur peut renouveler un code (l'ancien cesse de fonctionner et l'appareil concerné le redemande). Un foyer créé avant cette fonction peut l'activer dans Réglages > « Activer les codes personnels » ; tant que ce n'est pas fait, chacun choisit son profil comme avant. Ce verrouillage est un confort dans l'application : la base ne distingue pas les membres, ce n'est pas une sécurité forte, il faut donc garder le code du foyer privé.
+
+**Plusieurs participants** : une tâche peut être confiée à plusieurs personnes (cases « Responsable(s) »). À la fin, l'app demande qui a participé ; chaque participant reçoit les points complets, une seule fois par tâche. Le défi de la famille compte la tâche une seule fois.
+
+**Tâches en retard** : quand la date limite d'une tâche est passée, l'accueil affiche « À confirmer » avec un bouton « Fait ? » : on indique qui l'a faite (points attribués) ou on repousse la date. En mode Firebase avec notifications, chaque matin à 9 h (heure de Paris), le responsable (ou toute la famille si la tâche est « à prendre ») reçoit une alerte qui ouvre directement cette question, une seule fois par date limite.
+
+**Sons rigolos** : un petit son pour chaque étape (tâche créée, commencée, terminée, grande réussite, joker gagné ou envoyé, accord, lot de la roulette avec cliquetis, champion de la semaine). Ils sont activés par défaut ; Réglages > « Sons rigolos » les coupe sur l'appareil, et « Écouter un exemple » les fait entendre. Les sons sont synthétisés dans le navigateur, sans fichier audio.
+
+**Actualiser** : sur téléphone, tire la page vers le bas depuis le haut de l'écran (ou Paramètres > Actualiser l'app) pour charger la dernière version.
 
 ## Avoir les mêmes données pour toute la famille (lien GitHub)
 
@@ -33,7 +43,7 @@ Tant que `FIREBASE_CONFIG` vaut `null`, le lien GitHub fonctionne en mode local 
 
 ## Notifications push (même application fermée)
 
-Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'autre, un échange de joker ou une demande d'aide le concerne (et la réponse), un événement du calendrier est créé pour lui ou pour toute la famille, ou la semaine a un champion. Celui qui agit n'est jamais notifié de sa propre action. Elles suivent le profil choisi sur l'appareil. Elles n'existent que sur le lien GitHub (mode Firebase), pas sur la page claude.ai.
+Un téléphone est prévenu quand : une tâche est ajoutée par quelqu'un d'autre (tout le monde sauf l'auteur ; la personne à qui elle est confiée reçoit un message qui lui est destiné, et un seul), une tâche lui est confiée par la suite, un échange de joker ou une demande d'aide le concerne (et la réponse), un événement du calendrier est créé pour lui ou pour toute la famille, ou la semaine a un champion. **La veille d'un événement du calendrier**, à 18 h (heure de Paris, à changer dans `functions/notify.js` si besoin), la personne concernée est prévenue, ou toute la famille si l'événement est pour tous. **Rappel d'une tâche** : en créant ou modifiant une tâche, on peut choisir un jour et une heure (champ « Rappel ») ; une notification part à ce moment-là au responsable, ou à toute la famille si la tâche est « à prendre ». Les rappels sont envoyés par une fonction planifiée (Cloud Scheduler, une vérification par minute, quelques centimes au plus par mois). Celui qui agit n'est jamais notifié de sa propre action. Elles suivent le profil choisi sur l'appareil. Elles n'existent que sur le lien GitHub (mode Firebase), pas sur la page claude.ai.
 
 À faire une seule fois :
 
@@ -44,7 +54,7 @@ Un téléphone est prévenu quand : une tâche lui est confiée par quelqu'un d'
    git clone https://github.com/AdTeixeira89/taches-foyer.git && cd taches-foyer
    npm --prefix functions install
    npx firebase-tools login --no-localhost
-   npx firebase-tools deploy --only functions,firestore:rules --project taches-foyer
+   npx firebase-tools deploy --only functions,firestore --project taches-foyer
    ```
    Accepte l'activation des services Google proposés au premier déploiement. Si le déploiement signale que la région ne correspond pas à celle de Firestore, change `REGION` dans `functions/index.js`.
 4. **Sur chaque téléphone** : ouvre le lien, *Paramètres*, *Activer les notifications*. Sur iPhone (iOS 16.4 ou plus), ajoute d'abord l'application à l'écran d'accueil (Partager, *Sur l'écran d'accueil*) et active les notifications depuis son icône.

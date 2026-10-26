@@ -39,7 +39,14 @@
   --done:#6b7686;--late:#e0a15c;--scrim:rgba(0,0,0,.55);
   color-scheme:dark;
 }
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);overscroll-behavior-y:contain}
+.ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);width:38px;height:38px;margin-left:-19px;border-radius:50%;background:var(--surface);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;z-index:40;opacity:0;pointer-events:none;transform:translateY(-60px)}
+.ptr svg{width:20px;height:20px;transition:transform .15s}
+.ptr.go svg{color:var(--primary)}
+.ptr.spin svg{animation:ptrSpin .8s linear infinite}
+@keyframes ptrSpin{to{transform:rotate(360deg)}}
+.ptr.back{transition:transform .2s,opacity .2s}
+@media (prefers-reduced-motion: reduce){.ptr.spin svg{animation:none}.ptr.back{transition:none}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
   font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -105,6 +112,19 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 .meta{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:12px;color:var(--muted);margin-top:1px}
 .tag{color:var(--primary)}
 .late{color:var(--late)}
+.gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+.gate[hidden]{display:none}
+.gate-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 10px 30px rgba(10,20,40,.18)}
+.gate-card h1{margin:0 0 8px;font-size:21px}
+.gate-card input{font-size:22px;letter-spacing:.14em;text-align:center;text-transform:uppercase}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.crow .cn{display:flex;align-items:center;gap:8px;min-width:0;font-weight:700}
+.crow b.code{font-family:ui-monospace,Menlo,monospace;letter-spacing:.12em;font-size:17px}
+.latel{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}
+.latel:first-of-type{border-top:0}
+.latel .lt{min-width:0}.latel .lt b{display:block;overflow:hidden;text-overflow:ellipsis}
+.latel .lt span{color:var(--late);font-size:13px}
+.late-opts{display:grid;gap:8px;margin:4px 0 12px}
 .task.done .title{color:var(--done);text-decoration:line-through}
 .task.done .meta{color:var(--done)}
 .assign{display:flex;gap:4px;padding-top:5px}
@@ -524,6 +544,8 @@ input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;m
 <div id="pop" class="pop" role="status" data-action="popClose" hidden></div>
 <div id="sheetRoot"></div>
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="gate" class="gate" role="dialog" aria-modal="true" aria-label="Code personnel" hidden></div>
+<div id="ptr" class="ptr" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></div>
 
 <script>
 (function(){
@@ -556,7 +578,7 @@ function validDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
 const PREF_KEY = 'famille.prefs.v1';
 let ui = {view:'home', meSet:false, hiddenCols:{}, hideDone:true, status:'all', calMode:'month', me:'a', fx:{anim:true, sound:false}, celebrated:{}, missionShift:{}};
 try { const raw = localStorage.getItem(PREF_KEY); if (raw) ui = Object.assign(ui, JSON.parse(raw)); } catch(e) {}
-ui.fx = Object.assign({anim:true, sound:false}, ui.fx || {}); ui.celebrated = ui.celebrated || {}; ui.missionShift = ui.missionShift || {};
+ui.fx = Object.assign({anim:true, sound:true}, ui.fx || {}); if (!ui.fx.chosen) ui.fx.sound = true;  // sons rigolos par défaut, tant que la personne n'a pas fait son choix dans les Réglages ui.celebrated = ui.celebrated || {}; ui.missionShift = ui.missionShift || {};
 function savePrefs(){ try { localStorage.setItem(PREF_KEY, JSON.stringify(ui)); } catch(e) {} }
 
 /* ---------- état ---------- */
@@ -583,7 +605,7 @@ function mergeSettings(d){
     on: m.on !== false
   }));
   const s = {
-    names: {a: n.a || 'Adao', b: n.b || 'Maman', c: n.c || 'Fille'},
+    names: {a: n.a || 'Parent 1', b: n.b || 'Parent 2', c: n.c || 'Enfant'},
     daughterOn: d && typeof d.daughterOn === 'boolean' ? d.daughterOn : true,
     goal: d && Number(d.goal) > 0 ? Number(d.goal) : 20,
     collReward: (d && d.collReward) || 'Soirée pizza',
@@ -595,7 +617,7 @@ function mergeSettings(d){
 }
 const state = {
   tasks:[], ideas:[], events:[], points:[], weeks:[], pacts:[], jokers:[], spins:[], missions:[],
-  settings: mergeSettings(null), loaded:{},
+  settings: mergeSettings(null), loaded:{}, codes: null,
   mode:'connecting', canWrite:true
 };
 const cal = {anchor:new Date(), sel:todayStr(), showPast:false};
@@ -668,6 +690,91 @@ async function firebaseDb(code){
     }),
     doc: path => docApi(fsM.doc(fs, 'foyers', code, ...path.split('/')))
   };
+}
+
+/* ---------- codes personnels : un code par membre, un appareil = un profil (mode Firebase) ---------- */
+// settings/codes = {admin, codes: {a:'K7P2QX', ...}}. Tant que ce document n'existe pas (anciens foyers), chacun choisit son profil comme avant.
+// Une fois les codes activés, chaque appareil entre le code d'un membre et reste relié à ce profil : impossible de passer sur un autre.
+// C'est un verrouillage de confort dans l'application (la base ne distingue pas les membres), pas une sécurité forte.
+const PCODE_LEN = 6;
+const fmtPersonal = c => String(c || '').replace(/(.{3})(?=.)/g, '$1-');
+function mergeCodes(d){
+  if (!d || typeof d !== 'object') return null;
+  const codes = {};
+  Object.keys(d.codes || {}).forEach(k => { if (/^(a|b|c|m[a-z0-9]{2,16})$/.test(k) && /^[A-Z0-9]{6}$/.test(String(d.codes[k]))) codes[k] = String(d.codes[k]); });
+  return {admin: /^(a|b|c|m[a-z0-9]{2,16})$/.test(d.admin) ? d.admin : 'a', codes};
+}
+function newPersonalCode(taken){
+  for (;;) {
+    const a = new Uint32Array(PCODE_LEN); crypto.getRandomValues(a);
+    const c = Array.from(a, n => CODE_ABC[n % CODE_ABC.length]).join('');
+    if (taken.indexOf(c) < 0) return c;
+  }
+}
+const codesOf = () => (state.codes && state.codes.codes) || {};
+const usesCodes = () => store.backend === 'firebase' && !!state.codes;
+function lockOk(){ const L = ui.lock; return usesCodes() && !!L && L.fam === getFamilyCode() && codesOf()[L.who] === L.c; }
+const lockedWho = () => lockOk() ? ui.lock.who : '';
+const isAdmin = () => lockOk() && state.codes.admin === ui.lock.who;
+const whoOfCode = c => { const k = cleanCode(c); return Object.keys(codesOf()).filter(id => codesOf()[id] === k)[0] || ''; };
+function setLock(who, c){ ui.lock = {fam: getFamilyCode(), who, c}; ui.me = who; ui.meSet = true; savePrefs(); }
+let ensuring = false;
+let soundDemo = -1;
+async function ensureCodes(){
+  if (ensuring || !isAdmin() || !state.canWrite || !store.db) return;
+  const have = codesOf(), missing = everyone().filter(id => !have[id]);
+  if (!missing.length) return;
+  ensuring = true;
+  try {
+    const codes = Object.assign({}, have);
+    missing.forEach(id => { codes[id] = newPersonalCode(Object.keys(codes).map(k => codes[k])); });
+    await store.db.doc('settings/codes').set({admin: state.codes.admin, codes});
+  } catch(e) { console.error(e); }
+  ensuring = false;
+}
+function codesBoxHtml(){
+  if (store.backend !== 'firebase') return '';
+  if (!state.loaded.codes) return '<p class="help">Chargement des codes personnels…</p>';
+  if (!state.codes) {
+    return '<p class="sub" style="margin-top:0">Codes personnels</p><p class="help">Chaque membre aura son propre code et ne pourra utiliser que son profil : impossible de passer sur celui d’un autre. Une fois activés, chaque téléphone devra entrer le code de son propriétaire. Tu seras l’organisateur (' + esc(pname(meOf())) + ') : toi seul(e) verras les codes.</p>' +
+      '<button type="button" class="btn small" data-action="codesOn">Activer les codes personnels</button>';
+  }
+  if (!isAdmin()) {
+    return '<p class="sub" style="margin-top:0">Codes personnels</p><p class="help">Cet appareil est relié au profil de <b>' + esc(pname(meOf())) + '</b> (code <b>' + esc(fmtPersonal(codesOf()[meOf()])) + '</b>). Les codes des autres membres sont gardés par ' + esc(pname(state.codes.admin)) + '.</p>';
+  }
+  return '<p class="sub" style="margin-top:0">Codes personnels</p><p class="help">Donne à chacun son code. Sur un nouveau téléphone : code du foyer, puis code personnel. Un téléphone reste relié à un seul profil.</p>' +
+    activePeople().map(p => '<div class="crow"><span class="cn">' + avatar(p, 32) + '<span>' + esc(pname(p)) + '</span></span>' +
+      (codesOf()[p] ? '<b class="code">' + esc(fmtPersonal(codesOf()[p])) + '</b><button type="button" class="btn small" data-action="codeNew" data-p="' + p + '">Nouveau code</button>' : '<span class="muted">en préparation…</span>') + '</div>').join('');
+}
+function refreshCodesBox(){ const b = $('#codesBox'); if (b) b.innerHTML = codesBoxHtml(); }
+function renderGate(){
+  const g = $('#gate');
+  if (!g) return;
+  const need = store.backend === 'firebase' && state.mode === 'shared' && !!state.loaded.codes && usesCodes() && !lockOk();
+  if (!need) { if (!g.hidden) { g.hidden = true; g.innerHTML = ''; } return; }
+  if (!g.hidden) return;
+  g.hidden = false;
+  g.innerHTML = '<form id="gateForm" class="gate-card" novalidate><h1>Ton code personnel</h1>' +
+    '<p class="help">Chaque membre de la famille a son propre code. Entre le tien pour ouvrir ton profil sur cet appareil. Demande-le à ' + esc(pname(state.codes.admin) || 'la personne qui a créé le foyer') + ' si tu ne l’as pas.</p>' +
+    '<label class="fld"><span>Code personnel</span><input type="text" name="pc" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="ABC-DEF"></label>' +
+    '<p class="help" id="gateMsg" aria-live="polite"></p>' +
+    '<div class="sheet-actions"><button type="submit" class="btn primary">Ouvrir mon profil</button></div>' +
+    '<p class="center" style="margin:14px 0 0"><button type="button" class="link" data-action="leaveFamily">Utiliser un autre foyer</button></p></form>';
+  const inp = $('input', g); if (inp) setTimeout(() => inp.focus(), 50);
+}
+function gateSubmit(ev){
+  ev.preventDefault();
+  const f = ev.target, who = whoOfCode(f.elements.pc.value), msg = $('#gateMsg');
+  if (!who) { msg.textContent = 'Ce code ne correspond à aucun membre. Vérifie-le auprès de ' + (pname(state.codes.admin) || 'l’organisateur') + '.'; return; }
+  setLock(who, cleanCode(f.elements.pc.value));
+  renderAll(); push.setWho();
+  toast('Bonjour ' + pname(who) + ' !');
+}
+// profil à choisir (anciens foyers et mode local) : jamais quand le foyer utilise des codes personnels
+function maybeAskProfile(){
+  if (ui.meSet || sheet) return;
+  if (store.backend === 'firebase' && (!state.loaded.codes || state.codes || isNewFamily(getFamilyCode()))) return;
+  profileSheet();
 }
 
 /* ---------- notifications push (Firebase Cloud Messaging) ---------- */
@@ -751,7 +858,7 @@ function notifBoxHtml(){
   }
   return push.on()
     ? '<p class="help"><b>Notifications activées</b> pour ' + esc(pname(meOf())) + ' (le profil de cet appareil).</p><button type="button" class="btn small" data-action="notifOff">Désactiver</button>'
-    : '<p class="help">Reçois une notification quand une tâche t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
+    : '<p class="help">Reçois une notification quand une tâche est ajoutée ou t’est confiée, qu’un échange ou une demande d’aide te concerne, qu’un événement t’attend (aussi la veille à 18 h) ou que la semaine a un champion, même application fermée.</p><button type="button" class="btn small" data-action="notifOn">Activer les notifications</button>';
 }
 function refreshNotifBox(){ const b = $('#notifBox'); if (b) b.innerHTML = notifBoxHtml(); }
 
@@ -760,7 +867,7 @@ const store = {
   db: null,
   backend: '',
   async init(){
-    let db = null;
+    let db = null, created = false;
     try { if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db'); } catch(e) { db = null; }
     if (db) {
       this.db = db;
@@ -781,7 +888,7 @@ const store = {
       this.listen(db);
       push.resume();
       if (isNewFamily(code)) {
-        try { await this.seedNewFamily(); try { localStorage.removeItem(NEW_FAMILY_KEY); } catch(e) {} }
+        try { await this.seedNewFamily(); created = true; try { localStorage.removeItem(NEW_FAMILY_KEY); } catch(e) {} }
         catch(e) { console.error(e); toast('Le foyer est créé, mais les données de cet appareil n’ont pas toutes été copiées.'); }
       }
     } else {
@@ -790,7 +897,9 @@ const store = {
       try { applySettings(JSON.parse(localStorage.getItem('famille.local.settings') || 'null')); } catch(e) {}
     }
     renderAll();
-    if (!ui.meSet) setTimeout(() => { if (!sheet) profileSheet(); }, 500);
+    setTimeout(maybeAskProfile, 500);
+    // foyer tout juste créé : on ouvre les réglages pour remplacer les prénoms de démonstration et voir les codes
+    if (created) setTimeout(() => { if (!sheet && state.canWrite) settingsSheet(); }, 800);
   },
   listen(db){
     COLS.forEach(c => {
@@ -804,12 +913,23 @@ const store = {
       applySettings(snap.exists ? snap.data() : null);
       renderAll();
     }, onDbError);
+    if (this.backend === 'firebase') db.doc('settings/codes').onSnapshot(snap => {
+      state.codes = snap.exists ? mergeCodes(snap.data()) : null;
+      state.loaded.codes = true;
+      renderAll(); refreshCodesBox();
+      if (!state.codes) maybeAskProfile();
+    }, onDbError);
   },
   // nouveau foyer : on y recopie ce qui avait été saisi en mode local sur cet appareil (rien n'est effacé)
   async seedNewFamily(){
     let local = null;
     try { local = JSON.parse(localStorage.getItem('famille.local.settings') || 'null'); } catch(e) {}
     await this.db.doc('settings/family').set(mergeSettings(local));
+    // le créateur est l'organisateur (profil « a ») : un code personnel par profil de départ, cet appareil est relié au profil « a »
+    const codes = {};
+    ['a', 'b', 'c'].forEach(id => { codes[id] = newPersonalCode(Object.keys(codes).map(k => codes[k])); });
+    setLock('a', codes.a);
+    await this.db.doc('settings/codes').set({admin: 'a', codes});
     for (const c of COLS) {
       let rows = [];
       try { rows = JSON.parse(localStorage.getItem('famille.local.' + c) || '[]'); } catch(e) {}
@@ -899,38 +1019,86 @@ const val = (f, n) => { const el = f.elements[n]; return el ? (el.value || '').t
 const radio = (f, n) => { const el = f.querySelector('input[name="' + n + '"]:checked'); return el ? el.value : ''; };
 
 /* ---------- tâches ---------- */
+/* ---------- participants d'une tâche : un ou plusieurs membres ---------- */
+// `owners` (liste, facultative) quand plusieurs membres ; sinon le responsable unique `owner`. `owner` garde le premier (anciennes données).
+function ownersOf(t){
+  const l = Array.isArray(t.owners) && t.owners.length ? t.owners : (t.owner ? [t.owner] : []);
+  return Array.from(new Set(l.filter(x => typeof x === 'string' && x)));
+}
+const isOwner = (t, p) => ownersOf(t).indexOf(p) >= 0;
+function withOwners(o, list){
+  const l = Array.from(new Set(list)).filter(Boolean);
+  o.owner = l[0] || '';
+  if (l.length > 1) o.owners = l; else delete o.owners;
+  return o;
+}
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.indexOf(x) >= 0);
+// chaque personne ne reçoit les points d'une tâche qu'une seule fois
+const hasPoints = (taskId, who) => state.points.some(p => p.taskId === taskId && p.who === who);
+function checks(name, options, selected){
+  return '<div class="seg">' + options.map(o =>
+    '<label class="opt"><input type="checkbox" name="' + name + '" value="' + esc(o[0]) + '"' + (selected.indexOf(o[0]) >= 0 ? ' checked' : '') + '>' +
+    '<span>' + (o[2] ? '<i class="dot" style="--pc:' + o[2] + '"></i>' : '') + esc(o[1]) + '</span></label>').join('') + '</div>';
+}
+
+/* ---------- rappel d'une tâche : notification à l'heure choisie (mode Firebase) ---------- */
+function remindParts(ms){
+  if (!(Number(ms) > 0)) return {d: '', t: ''};
+  const x = new Date(Number(ms));
+  return {d: ymd(x), t: pad(x.getHours()) + ':' + pad(x.getMinutes())};
+}
+// jour et heure saisis -> millisecondes (heure locale) ; jour seul = 9 h, heure seule = aujourd'hui
+function remindFrom(dStr, tStr){
+  const d = validDate(dStr) ? dStr : '', tm = /^\d{2}:\d{2}$/.test(tStr || '') ? tStr : '';
+  if (!d && !tm) return 0;
+  const a = (d || todayStr()).split('-').map(Number), b = (tm || '09:00').split(':').map(Number);
+  return new Date(a[0], a[1] - 1, a[2], b[0], b[1]).getTime();
+}
+const remindLabel = ms => { const p = remindParts(ms); return relDate(p.d) + ' ' + p.t; };
+const withRemind = (o, ms) => { if (ms) o.remindAt = ms; else delete o.remindAt; return o; };
+
 function taskSheet(t, preOwner){
   const isNew = !t;
   t = t || {title:'', owner: preOwner || '', status:'todo', due:'', pts:2};
-  const owners = [['', 'Personne', 'var(--done)']].concat(activePeople().map(p => [p, pname(p), COLORS[p]]));
+  const owners = activePeople().map(p => [p, pname(p), COLORS[p]]);
+  const rp = remindParts(t.remindAt);
   const body =
     '<label class="fld"><span>Tâche</span><input type="text" name="title" maxlength="140" autocomplete="off" enterkeyhint="done" value="' + esc(t.title) + '" placeholder="Ex. Appeler l\'école"></label>' +
-    '<div class="fld"><span class="lab">Responsable</span>' + radios('owner', owners, t.owner) + '</div>' +
+    '<div class="fld"><span class="lab">Responsable(s)</span>' + checks('owner', owners, ownersOf(t)) + '<p class="help" style="margin:6px 0 0">Choisis une ou plusieurs personnes. Sans personne, la tâche est « À prendre ». À plusieurs, chacun reçoit les points complets à la fin.</p></div>' +
     '<div class="fld"><span class="lab">Difficulté (points à la fin)</span>' + radios('pts', LEVELS.map(l => [String(l[0]), l[1]]), String(Number(t.pts) || 2)) + '</div>' +
     (isNew ? '' : '<div class="fld"><span class="lab">Statut</span>' + radios('status', Object.keys(STATUS).map(k => [k, STATUS[k]]), t.status) + '</div>') +
     '<label class="fld"><span>Date limite (facultatif)</span><div class="row"><input type="date" name="due" value="' + esc(t.due) + '"><button type="button" class="link" data-action="clearDue">Effacer</button></div></label>' +
+    (push.configured() ? '<div class="fld"><span class="lab">Rappel (facultatif)</span><div class="row" style="flex-wrap:wrap"><input type="date" name="remindDate" aria-label="Jour du rappel" value="' + esc(rp.d) + '" style="flex:1 1 9em;width:auto;min-width:0"><input type="time" name="remindTime" aria-label="Heure du rappel" value="' + esc(rp.t) + '" style="flex:0 1 8.5em;width:auto;min-width:0"><button type="button" class="link" data-action="clearRemind">Effacer</button></div>' +
+      '<p class="help" style="margin:6px 0 0">Une notification est envoyée à l’heure choisie à la personne responsable, ou à toute la famille si personne n’est désigné.' + (push.on() ? '' : ' Active les notifications dans les Paramètres pour la recevoir sur ce téléphone.') + '</p></div>' : '') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button>' +
     (isNew ? '' : '<button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button>') + '</div>';
   openSheet(isNew ? 'Nouvelle tâche' : 'Modifier la tâche', body, async f => {
     const title = val(f, 'title');
     if (!title) { f.elements.title.focus(); return false; }
-    const owner = radio(f, 'owner');
+    const owners = $$('input[name="owner"]:checked', f).map(i => i.value);
     const due = validDate(val(f, 'due')) ? val(f, 'due') : '';
     const pts = Number(radio(f, 'pts')) || 2;
+    // rappel : champ proposé seulement quand les notifications existent ; sinon on garde ce qui était déjà enregistré
+    const prevRemind = Number(t.remindAt) || 0;
+    let remindAt = prevRemind;
+    if (push.configured()) {
+      remindAt = remindFrom(val(f, 'remindDate'), val(f, 'remindTime'));
+      if (remindAt && remindAt !== prevRemind && remindAt < Date.now() - 60000) { toast('L’heure du rappel est déjà passée.'); return false; }
+    }
     if (isNew) {
-      const data = {title, owner, status:'todo', due, pts, createdAt: Date.now(), by: meOf()};
-      return run(() => store.set('tasks', uid(), data));
+      const data = withRemind(withOwners({title, status:'todo', due, pts, createdAt: Date.now(), by: meOf()}, owners), remindAt);
+      return run(() => store.set('tasks', uid(), data)).then(ok => { if (ok) sfx('pop'); return ok; });
     }
     const status = radio(f, 'status') || t.status;
-    const fields = {title, owner, pts, due};
-    if (owner !== t.owner) fields.by = meOf();
+    const fields = {title, pts, due};
+    if (!sameSet(owners, ownersOf(t))) fields.by = meOf();
     if (status === 'done' && t.status !== 'done') {
-      const merged = Object.assign({}, t, fields);
-      const saved = await run(() => store.set('tasks', t.id, Object.assign(strip(t), fields)));
+      const doc = withRemind(withOwners(Object.assign(strip(t), fields), owners), remindAt);
+      const saved = await run(() => store.set('tasks', t.id, doc));
       if (!saved) return false;
-      closeSheet(); finishTask(merged); return 'keep';
+      closeSheet(); finishTask(Object.assign({id: t.id}, doc)); return 'keep';
     }
-    return run(() => store.set('tasks', t.id, Object.assign(strip(t), fields, {status})));
+    return run(() => store.set('tasks', t.id, withRemind(withOwners(Object.assign(strip(t), fields, {status}), owners), remindAt)));
   }, isNew ? {} : {onDelete: () => deleteWithUndo('tasks', t, 'Tâche supprimée')});
 }
 function deleteWithUndo(col, obj, msg){
@@ -982,10 +1150,12 @@ function statusRing(s){
 function taskCard(t, assign){
   const s = STATUS[t.status] ? t.status : 'todo', tier = tierOf(t), T = TIER[tier], pv = ptsOf(t);
   const late = t.due && t.due < todayStr() && s !== 'done';
-  const got = s === 'done' && byId('points', t.id);
+  const got = s === 'done' && state.points.some(p => p.taskId === t.id);
   const pills = '<span class="pill tier">' + T.label + '</span>' +
     '<span class="pill pts">' + IC.star(12) + (got ? '+' : '') + pv + ' pt' + (pv > 1 ? 's' : '') + '</span>' +
     (t.due ? '<span class="pill' + (late ? ' late' : '') + '">' + ico('cal', 12) + esc(relDate(t.due)) + '</span>' : '') +
+    (ownersOf(t).length > 1 ? '<span class="pill" title="Participants">' + ico('users', 12) + esc(ownersOf(t).map(pname).join(', ')) + '</span>' : '') +
+    (Number(t.remindAt) > 0 && s !== 'done' ? '<span class="pill" title="Rappel">' + ico('bell', 12) + esc(remindLabel(t.remindAt)) + '</span>' : '') +
     (s === 'doing' ? '<span class="pill doing">En cours</span>' : '') + (s === 'done' ? '<span class="pill okp">Fait</span>' : '');
   const av = assign ? '<span class="assign">' + activePeople().map(p =>
     '<button type="button" class="av-btn" data-action="assign" data-id="' + esc(t.id) + '" data-p="' + p + '" aria-label="Attribuer à ' + esc(pname(p)) + '" title="' + esc(pname(p)) + '">' + avatar(p, 40) + '</button>').join('') + '</span>' : '';
@@ -1016,7 +1186,7 @@ function renderTasks(){
     return true;
   }).sort(taskSort);
 
-  const pool = list.filter(t => people.indexOf(t.owner) < 0);
+  const pool = list.filter(t => !ownersOf(t).some(o => people.indexOf(o) >= 0));
   $('#pool').innerHTML = pool.length
     ? '<div class="pool"><h3>' + IC.hand(18) + 'À prendre (' + pool.length + ')</h3><p class="muted" style="margin:0 0 6px">Touche un avatar pour prendre la tâche.</p><ul class="list">' + pool.map(t => taskCard(t, true)).join('') + '</ul></div>' : '';
 
@@ -1024,8 +1194,8 @@ function renderTasks(){
   cols.style.setProperty('--n', Math.min(Math.max(vis.length, 1), 4));
   if (!vis.length) { cols.innerHTML = '<p class="empty">Aucune colonne affichée. Touche un prénom ci-dessus pour la montrer.</p>'; return; }
   cols.innerHTML = vis.map(p => {
-    const mine = list.filter(t => t.owner === p);
-    const open = state.tasks.filter(t => t.owner === p && t.status !== 'done').length;
+    const mine = list.filter(t => isOwner(t, p));
+    const open = state.tasks.filter(t => isOwner(t, p) && t.status !== 'done').length;
     return '<div class="col" style="--pc:' + COLORS[p] + '"><div class="col-h">' + avatar(p, 44) + '<span class="nm">' + esc(pname(p)) + '</span><span class="ct">' + open + ' à faire</span>' +
       '<button type="button" class="add" data-action="newTask" data-p="' + p + '" aria-label="Ajouter une tâche pour ' + esc(pname(p)) + '">+</button></div>' +
       (mine.length ? '<ul class="list">' + mine.map(t => taskCard(t, false)).join('') + '</ul>' : '<p class="empty">Rien ici pour le moment</p>') + '</div>';
@@ -1052,6 +1222,7 @@ function eventSheet(e, date){
     '<div class="row fld"><label style="flex:1"><span class="lab" style="display:block;font-size:13px;color:var(--muted);margin-bottom:5px">Date</span><input type="date" name="date" value="' + esc(e.date) + '"></label>' +
     '<label style="flex:1"><span class="lab" style="display:block;font-size:13px;color:var(--muted);margin-bottom:5px">Heure (facultatif)</span><input type="time" name="time" value="' + esc(e.time) + '"></label></div>' +
     '<div class="fld"><span class="lab">Pour</span>' + radios('who', who, COLORS[e.who] ? e.who : 'all') + '</div>' +
+    (push.configured() ? '<p class="help">Une notification est envoyée la veille à 18 h à la personne concernée (à toute la famille si l’événement est pour tous).' + (push.on() ? '' : ' Active les notifications dans les Paramètres pour la recevoir sur ce téléphone.') + '</p>' : '') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button>' +
     (isNew ? '' : '<button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button>') + '</div>';
   openSheet(isNew ? 'Nouvel événement' : 'Modifier l’événement', body, async f => {
@@ -1152,6 +1323,7 @@ function settingsSheet(addNew){
   const s = state.settings;
   const body =
     '<p class="help">Les prénoms, les membres et la colonne de ta fille sont partagés avec toute la famille.</p>' +
+    (store.backend === 'firebase' && state.mode === 'shared' ? '<div class="fld" id="codesBox">' + codesBoxHtml() + '</div>' : '') +
     ['a','b','c'].map(k => '<label class="fld"><span>' + (k === 'a' ? 'Premier prénom' : k === 'b' ? 'Deuxième prénom' : 'Troisième prénom') + '</span><input type="text" name="n_' + k + '" maxlength="24" autocomplete="off" value="' + esc(s.names[k]) + '"></label>').join('') +
     activePeople().filter(p => BASE_PEOPLE.indexOf(p) >= 0).map(p => '<div class="fld"><span class="lab">Avatar de ' + esc(pname(p)) + '</span><div class="seg">' + AVATARS.map(a => '<label class="opt"><input type="radio" name="av_' + p + '" value="' + a + '"' + (s.avatars[p] === a ? ' checked' : '') + '><span title="' + AVATAR_NAMES[a] + '" style="padding:0 6px">' + avatar(p, 48, a) + '</span></label>').join('') + '</div></div>').join('') +
     '<label class="check"><input type="checkbox" name="daughterOn"' + (s.daughterOn ? ' checked' : '') + '><span>Utiliser la colonne de ma fille</span></label>' +
@@ -1163,7 +1335,9 @@ function settingsSheet(addNew){
     '<div class="seg" style="margin:-6px 0 14px">' + ['Soirée pizza', 'Jeu de société', 'Sortie familiale'].map(r => '<button type="button" class="chip" data-action="rewardPreset" data-t="' + r + '">' + r + '</button>').join('') + '</div>' +
     '<p class="help" style="margin-bottom:4px">Sur cet appareil :</p>' +
     '<label class="check"><input type="checkbox" name="animOn"' + (ui.fx.anim ? ' checked' : '') + '><span>Animations et confettis</span></label>' +
-    '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons</span></label>' +
+    '<label class="check"><input type="checkbox" name="soundOn"' + (ui.fx.sound ? ' checked' : '') + '><span>Sons rigolos</span></label>' +
+    '<p style="margin:0 0 8px"><button type="button" class="btn small" data-action="soundTest">Écouter un exemple</button></p>' +
+    '<p style="margin:10px 0 0"><button type="button" class="btn small" data-action="reload">Actualiser l’app</button> <span class="help">Sur téléphone, tu peux aussi tirer la page vers le bas.</span></p>' +
     (push.configured() ? '<div class="fld" id="notifBox" style="margin-top:10px">' + notifBoxHtml() + '</div>' : '') +
     (store.backend === 'firebase'
       ? '<p class="help" style="margin-top:12px">Foyer partagé, code <b>' + esc(fmtCode(getFamilyCode())) + '</b>. Sur un autre téléphone, ouvre ce même lien et entre ce code. <button type="button" class="link" data-action="family">Gérer le foyer</button></p>'
@@ -1172,8 +1346,8 @@ function settingsSheet(addNew){
         : '<p class="help" style="margin-top:12px">Ici, les données restent sur cet appareil. <a class="link" href="' + esc(SHARED_URL) + '" target="_top" rel="noopener">Ouvrir la version familiale</a></p>') +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button></div>';
   openSheet('Réglages', body, async f => {
-    const names = {a: val(f,'n_a') || 'Adao', b: val(f,'n_b') || 'Maman', c: val(f,'n_c') || 'Fille'};
-    ui.fx = {anim: f.elements.animOn.checked, sound: f.elements.soundOn.checked}; savePrefs();
+    const names = {a: val(f,'n_a') || 'Parent 1', b: val(f,'n_b') || 'Parent 2', c: val(f,'n_c') || 'Enfant'};
+    ui.fx = {anim: f.elements.animOn.checked, sound: f.elements.soundOn.checked, chosen: true}; savePrefs();
     const goalV = Math.min(99, Math.max(1, parseInt(val(f, 'goal'), 10) || 20));
     const avatars = {}; BASE_PEOPLE.forEach(p => { avatars[p] = radio(f, 'av_' + p) || state.settings.avatars[p]; });
     const members = $$('.mrow', f).map((row, i) => { const id = row.dataset.id; return {id, name: val(f, 'mn_' + id) || 'Membre ' + (i + 1), avatar: radio(f, 'mav_' + id) || DEFAULT_EXTRA_AVATARS[i % DEFAULT_EXTRA_AVATARS.length], on: f.elements['mon_' + id].checked}; });
@@ -1198,6 +1372,7 @@ function renderChrome(){
   b.innerHTML = esc(msg) + (link ? ' <a href="' + esc(link) + '" target="_top" rel="noopener">Ouvrir la version familiale</a>' : '') + (btn ? ' ' + btn : '');
   $('#btnNewTask').disabled = !state.canWrite;
   $('#btnMe').innerHTML = avatar(meOf(), 40);
+  $('#btnMe').setAttribute('aria-label', lockedWho() ? 'Mon profil' : 'Changer de profil');
   VIEWS.forEach(v => { const el = $('#view-' + v); if (el) el.hidden = v !== ui.view; });
   renderNav();
 }
@@ -1206,7 +1381,8 @@ function renderAll(){
   renderChrome();
   const r = {home: renderHome, tasks: renderTasks, fun: renderChallenges, wheel: renderWheel, bonus: renderBonus, family: renderFamily, history: renderHistory, cal: renderCal};
   r[ui.view]();
-  finalizeWeeks(); maybeCelebrate();
+  renderGate(); ensureCodes();
+  finalizeWeeks(); maybeCelebrate(); openDeepLate();
 }
 function setView(v){ ui.view = v; savePrefs(); renderAll(); window.scrollTo(0, 0); }
 
@@ -1217,7 +1393,7 @@ const curWeek = () => wkOf(todayStr());
 const nextWeek = () => ymd(addDays(parseYmd(curWeek()), 7));
 const prevWeek = () => ymd(addDays(parseYmd(curWeek()), -7));
 const weekLabel = wk => { const s = parseYmd(wk); return fmtDM.format(s) + ' – ' + fmtDM.format(addDays(s, 6)); };
-const meOf = () => activePeople().indexOf(ui.me) >= 0 ? ui.me : 'a';
+const meOf = () => lockedWho() || (activePeople().indexOf(ui.me) >= 0 ? ui.me : 'a');
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const goalOf = () => state.settings.goal;
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1235,7 +1411,7 @@ function championOf(wk){
   const max = Math.max.apply(null, [0].concat(ppl.map(p => t[p])));
   return {t, max, list: max > 0 ? ppl.filter(p => t[p] === max) : []};
 }
-const countOf = wk => state.points.filter(p => p.week === wk).length;
+const countOf = wk => new Set(state.points.filter(p => p.week === wk).map(p => p.taskId || p.id)).size;
 const namesOf = list => list.map(pname).join(' et ');
 
 /* icônes simples */
@@ -1294,22 +1470,67 @@ function curStreak(who){
 /* animations et sons (désactivables) */
 const fxOn = () => ui.fx.anim && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 let audioCtx = null;
+const getAudio = () => { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch(e) { audioCtx = null; } return audioCtx; };
+// le navigateur n'autorise le son qu'après un geste : on réveille l'audio dès le premier appui
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (ui.fx.sound) getAudio(); }, {passive: true}));
+// notes de la mélodie : [fréquence, durée] (ancien format, conservé)
 function tone(seq){
   if (!ui.fx.sound) return;
+  let at = 0;
+  playVoices(seq.map(n => { const v = {f: n[0], d: n[1], at, v: .12}; at += n[1] * .8; return v; }));
+}
+// une voix : f = fréquence, to = glissando vers, d = durée, at = départ (s), type = forme d'onde, v = volume, vib = vibrato (Hz)
+function playVoices(voices){
+  const ac = getAudio();
+  if (!ac) return;
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    let t = audioCtx.currentTime;
-    seq.forEach(n => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.type = 'sine'; o.frequency.value = n[0];
+    const t0 = ac.currentTime + 0.01;
+    voices.forEach(n => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = t0 + (n.at || 0), v = n.v || .12, d = n.d || .1;
+      o.type = n.type || 'sine';
+      o.frequency.setValueAtTime(n.f, t);
+      if (n.to) o.frequency.exponentialRampToValueAtTime(n.to, t + d);
+      if (n.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = n.vib; lg.gain.value = n.f * .03; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + d + .05); }
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + n[1]);
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(t); o.stop(t + n[1] + 0.02);
-      t += n[1] * 0.8;
+      g.gain.exponentialRampToValueAtTime(v, t + Math.min(.02, d / 3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t); o.stop(t + d + .03);
     });
   } catch(e) {}
+}
+// sons rigolos : un par étape réussie (boing, ta-da, pièce magique, fanfare…)
+const SFX = {
+  pop:    [{f: 420, to: 1100, d: .1, type: 'sine', v: .2}, {f: 1100, to: 700, d: .07, at: .09, type: 'sine', v: .12}],                       // tâche créée : « bloup »
+  boing:  [{f: 180, to: 620, d: .18, type: 'triangle', v: .22, vib: 28}, {f: 620, to: 260, d: .16, at: .17, type: 'triangle', v: .16, vib: 22}],  // tâche commencée : ressort
+  back:   [{f: 520, to: 220, d: .16, type: 'triangle', v: .16}],                                                                             // retour en arrière : « ouuuh » doux
+  done:   [{f: 523, d: .1, type: 'square', v: .06}, {f: 659, d: .1, at: .09, type: 'square', v: .06}, {f: 784, d: .1, at: .18, type: 'square', v: .06},
+           {f: 1046, d: .3, at: .27, type: 'square', v: .07}, {f: 1568, to: 2093, d: .25, at: .36, type: 'sine', v: .08}],                  // tâche terminée : ta-da
+  big:    [{f: 392, d: .12, type: 'sawtooth', v: .06}, {f: 523, d: .12, at: .1, type: 'sawtooth', v: .06}, {f: 659, d: .12, at: .2, type: 'sawtooth', v: .06},
+           {f: 784, d: .12, at: .3, type: 'sawtooth', v: .06}, {f: 1046, d: .5, at: .4, type: 'sawtooth', v: .07, vib: 6}, {f: 1318, d: .5, at: .4, type: 'sine', v: .07},
+           {f: 600, to: 2400, d: .5, at: .45, type: 'sine', v: .05}],                                                                          // grande réussite : fanfare + étincelles
+  joker:  [{f: 988, d: .07, type: 'square', v: .07}, {f: 1319, d: .45, at: .07, type: 'square', v: .07}, {f: 500, to: 2200, d: .4, at: .2, type: 'sine', v: .07},
+           {f: 1568, d: .12, at: .5, type: 'sine', v: .07}, {f: 2093, d: .3, at: .6, type: 'sine', v: .07}],                                // joker gagné : pièce + glissando magique
+  win:    [{f: 659, d: .12, type: 'triangle', v: .12}, {f: 784, d: .12, at: .1, type: 'triangle', v: .12}, {f: 988, d: .12, at: .2, type: 'triangle', v: .12},
+           {f: 1319, d: .4, at: .3, type: 'triangle', v: .14, vib: 7}],                                                                      // lot gagné
+  yay:    [{f: 440, to: 660, d: .1, type: 'triangle', v: .14}, {f: 660, to: 990, d: .12, at: .1, type: 'triangle', v: .14}, {f: 880, d: .2, at: .22, type: 'sine', v: .1}],  // merci / accord
+  whoosh: [{f: 300, to: 1400, d: .22, type: 'sawtooth', v: .04}, {f: 1400, to: 500, d: .2, at: .2, type: 'sine', v: .06}],                      // joker envoyé
+  champ:  [{f: 392, to: 440, d: .2, type: 'sawtooth', v: .07, vib: 8}, {f: 392, d: .12, at: .22, type: 'sawtooth', v: .07}, {f: 523, d: .12, at: .36, type: 'sawtooth', v: .07},
+           {f: 659, d: .12, at: .5, type: 'sawtooth', v: .07}, {f: 784, d: .6, at: .64, type: 'sawtooth', v: .08, vib: 7}, {f: 1046, d: .6, at: .64, type: 'sine', v: .08}],  // champion : trompette
+  tick:   [{f: 1800, to: 900, d: .03, type: 'square', v: .05}]                                                                                // roulette : cliquetis
+};
+function sfx(name, force){
+  if (!force && !ui.fx.sound) return;
+  const v = SFX[name];
+  if (v) playVoices(v);
+}
+// cliquetis de la roulette : ralentit comme la roue (sur la durée de l'animation)
+function spinTicks(ms, n){
+  if (!ui.fx.sound) return;
+  for (let i = 1; i <= n; i++) {
+    const frac = 1 - Math.pow(1 - i / n, 1 / 3);
+    setTimeout(() => sfx('tick'), Math.round(frac * ms));
+  }
 }
 function confetti(){
   if (!fxOn()) return;
@@ -1355,36 +1576,43 @@ function popDone(pts, msg, extra, lv){
     (lv ? xpBar(lv) + '<p class="muted" style="margin:4px 0 0">Niveau ' + lv.level + ' : ' + lv.into + ' / ' + lv.need + '</p>' : ''), extra ? 3800 : 2800);
 }
 
-/* terminer une tâche : points attribués une seule fois (identifiant du point = identifiant de la tâche) */
+/* terminer une tâche : chaque participant reçoit ses points une seule fois (un point par personne et par tâche) */
 function setStatus(t, next){
   if (next === 'done') return finishTask(t);
+  sfx(next === 'doing' ? 'boing' : 'back');
   return run(() => store.update('tasks', t.id, {status: next}));
 }
 function finishTask(t){
-  const who = t.owner && activePeople().indexOf(t.owner) >= 0 ? t.owner : '';
-  if (who) return completeTask(t, who);
-  askWho(t);
+  const owners = ownersOf(t).filter(o => activePeople().indexOf(o) >= 0);
+  if (owners.length === 1) return completeTask(t, owners);
+  askWho(t, owners);
 }
-function askWho(t){
+// personne désignée ou plusieurs participants : on confirme qui a fait la tâche (tous les participants cochés au départ)
+function askWho(t, preset){
   const opts = activePeople().map(p => [p, pname(p), COLORS[p]]);
-  openSheet('Qui l’a terminée ?',
-    '<p class="help">« ' + esc(t.title) + ' »</p><div class="fld">' + radios('who', opts, meOf()) + '</div>' +
+  const several = preset && preset.length > 1;
+  openSheet(several ? 'Qui a participé ?' : 'Qui l’a terminée ?',
+    '<p class="help">« ' + esc(t.title) + ' »</p><div class="fld">' + checks('who', opts, preset && preset.length ? preset : [meOf()]) + '</div>' +
+    '<p class="help">Chaque personne cochée reçoit les points complets, une seule fois pour cette tâche.</p>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Terminée</button></div>',
-    async f => { const who = radio(f, 'who'); if (!who) return false; closeSheet(); completeTask(t, who); return 'keep'; });
+    async f => { const who = $$('input[name="who"]:checked', f).map(i => i.value); if (!who.length) return false; closeSheet(); completeTask(t, who); return 'keep'; });
 }
-async function completeTask(t, who){
-  const wk = curWeek(), before = badgesOf(who), cBefore = countOf(wk);
-  const dup = !!byId('points', t.id);
-  const pts = ptsOf(t), day = todayStr();
-  const lvInfo = levelInfo(who, dup ? 0 : pts), lvUp = !dup && lvInfo.level > levelInfo(who).level;
-  const rec = {taskId: t.id, title: t.title, who, pts, day, week: wkOf(day), at: Date.now(), pool: !!t.tookFromPool};
+async function completeTask(t, whoList){
+  const list = Array.from(new Set(whoList)).filter(Boolean), multi = list.length > 1;
+  const wk = curWeek(), cBefore = countOf(wk), pts = ptsOf(t), day = todayStr();
+  const fresh = list.filter(w => !hasPoints(t.id, w));
+  // un seul participant : identifiant du point = identifiant de la tâche (comme avant) ; plusieurs : un point par personne
+  const recs = fresh.map(w => ({id: multi ? t.id + '_' + w : t.id, rec: {taskId: t.id, title: t.title, who: w, pts, day, week: wkOf(day), at: Date.now(), pool: !!t.tookFromPool}}));
+  const focus = fresh.indexOf(meOf()) >= 0 ? meOf() : fresh[0];
+  const before = focus ? badgesOf(focus) : null;
+  const lvInfo = focus ? levelInfo(focus, pts) : null, lvUp = !!focus && lvInfo.level > levelInfo(focus).level;
   const ok = await run(async () => {
-    await store.update('tasks', t.id, {status:'done', owner: who, doneAt: Date.now()});
-    if (!dup) await store.set('points', t.id, rec);
+    await store.set('tasks', t.id, withOwners(Object.assign(strip(t), {status: 'done', doneAt: Date.now()}), list));
+    for (const r of recs) await store.set('points', r.id, r.rec);
   });
   if (!ok) return;
-  if (dup) { toast('Terminée. Les points de cette tâche étaient déjà comptés.'); return; }
-  const after = badgesOf(who, [rec]);
+  if (!recs.length) { toast('Terminée. Les points de cette tâche étaient déjà comptés.'); return; }
+  const after = badgesOf(focus, [recs.filter(r => r.rec.who === focus)[0].rec]);
   const newB = BADGES.filter(b => after[b.id] && !before[b.id]);
   const goalHit = cBefore < goalOf() && cBefore + 1 >= goalOf();
   let extra = '';
@@ -1392,9 +1620,44 @@ async function completeTask(t, who){
   else if (newB.length) extra = 'Nouveau badge : ' + newB[0].name;
   else if (goalHit) extra = 'Défi de la famille atteint !';
   const big = pts >= 3 || newB.length > 0 || goalHit || lvUp;
-  popDone(pts, pick(DONE_MSGS), extra, lvInfo);
-  if (big) { confetti(); tone([[523,.12],[659,.12],[784,.12],[1046,.26]]); }
-  else tone([[660,.12],[880,.16]]);
+  popDone(pts, fresh.length > 1 ? 'Bravo ' + namesOf(fresh) + ' : ' + pts + ' point' + (pts > 1 ? 's' : '') + ' chacun !' : pick(DONE_MSGS), extra, lvInfo);
+  if (big) { confetti(); sfx('big'); }
+  else sfx('done');
+}
+
+/* ---------- tâche en retard : est-elle faite (et par qui), ou on repousse la date ---------- */
+const lateTasksOf = p => state.tasks.filter(t => t.status !== 'done' && validDate(t.due) && t.due < todayStr() && (!ownersOf(t).length || isOwner(t, p))).sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0);
+function lateSheet(t){
+  openSheet('Cette tâche est en retard',
+    '<p class="big" style="margin:0 0 4px">« ' + esc(t.title) + ' »</p>' +
+    '<p class="help late">Prévue le ' + esc(fmtDayLong.format(parseYmd(t.due))) + '. Est-elle faite ?</p>' +
+    '<div class="late-opts"><button type="button" class="btn primary" data-action="lateDone" data-id="' + esc(t.id) + '">Oui, elle est faite</button>' +
+    '<button type="button" class="btn" data-action="lateSnooze" data-id="' + esc(t.id) + '">Pas encore : repousser la date</button>' +
+    '<button type="button" class="btn quiet" data-action="closeSheet">Plus tard</button></div>', async () => false);
+}
+function snoozeSheet(t){
+  const today = new Date(), opts = [['1', 'Demain'], ['3', 'Dans 3 jours'], ['7', 'Dans 1 semaine']];
+  openSheet('Repousser la date',
+    '<p class="help">« ' + esc(t.title) + ' »</p>' +
+    '<div class="fld">' + radios('snz', opts.map(o => [ymd(addDays(today, +o[0])), o[1] + ' · ' + fmtDM.format(addDays(today, +o[0]))]), ymd(addDays(today, 1))) + '</div>' +
+    '<label class="fld"><span>Ou choisir une date</span><input type="date" name="other" min="' + ymd(addDays(today, 1)) + '"></label>' +
+    '<div class="sheet-actions"><button type="submit" class="btn primary">Repousser</button></div>',
+    async f => {
+      const d = validDate(val(f, 'other')) ? val(f, 'other') : radio(f, 'snz');
+      if (!validDate(d) || d <= todayStr()) { toast('Choisis une date à venir.'); return false; }
+      return run(() => store.update('tasks', t.id, {due: d})).then(ok => { if (ok) toast('Nouvelle date : ' + fmtShort.format(parseYmd(d)) + '.'); return ok; });
+    });
+}
+// un lien de notification (?retard=<tâche>) ouvre directement la question
+let deepLate = (() => { try { return new URLSearchParams(location.search).get('retard') || ''; } catch(e) { return ''; } })();
+function openDeepLate(){
+  if (!deepLate || !state.loaded.tasks || sheet) return;
+  const id = deepLate; deepLate = '';
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch(e) {}
+  const t = byId('tasks', id);
+  if (!t) return;
+  if (t.status === 'done') toast('Cette tâche est déjà terminée.');
+  else if (validDate(t.due) && t.due < todayStr() && state.canWrite) lateSheet(t);
 }
 
 /* clôture des semaines passées : historique conservé, sans doublon (id = lundi de la semaine) */
@@ -1423,7 +1686,7 @@ function celebrateChampion(wk){
     '<div class="champ">' + IC.trophy(64) + '<p class="big">' + esc(namesOf(c.list)) + '</p><p>' + esc(msg) + '</p>' +
     '<p class="muted">Merci à toute la famille : ' + total + ' points cette semaine.</p></div>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Merci !</button></div>', async () => true);
-  confetti(); tone([[523,.14],[659,.14],[784,.14],[1046,.3]]);
+  confetti(); sfx('champ');
 }
 function maybeCelebrate(){
   if (['home','family','fun'].indexOf(ui.view) < 0 || sheet || !state.loaded.points) return;
@@ -1497,7 +1760,7 @@ function jokersLeft(who, kind){
 }
 function jokerSheet(kind){
   const me = meOf(), wk = curWeek();
-  const mine = state.tasks.filter(t => t.owner === me && t.status !== 'done').sort(taskSort);
+  const mine = state.tasks.filter(t => isOwner(t, me) && t.status !== 'done').sort(taskSort);
   const others = activePeople().filter(p => p !== me);
   const short = t => t.title.length > 38 ? t.title.slice(0, 37) + '…' : t.title;
   let body = '', save;
@@ -1520,7 +1783,7 @@ function jokerSheet(kind){
   openSheet(JOKERS[kind], body + '<div class="sheet-actions"><button type="submit" class="btn primary">Utiliser mon joker</button></div>', async f => {
     if (jokersLeft(me, kind) < 1) { toast('Plus de joker de ce type cette semaine.'); return false; }
     const data = Object.assign(save(f), {week: wk, at: Date.now()});
-    return run(() => store.set('jokers', uid(), data));
+    return run(() => store.set('jokers', uid(), data)).then(ok => { if (ok) sfx('whoosh'); return ok; });
   });
 }
 function jokerItems(){
@@ -1628,6 +1891,7 @@ function rewardArt(text){
 }
 const NAVIC = {
   home: GLYPH.home,
+  bell: '<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7zM10 20a2 2 0 0 0 4 0"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
   flame: GLYPH.flame,
   wheel: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6L6 18"/>',
@@ -1669,6 +1933,8 @@ function familySheet(){
       '<p class="help">Rejoindre un autre foyer :</p>'
     : '<p class="help">Pour que toute la famille ait les mêmes données, chacun utilise le même code de foyer. La première personne crée le foyer, les autres entrent son code.</p>') +
     '<label class="fld"><span>Code du foyer</span><input type="text" name="code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="XXXX-XXXX-XXXX"></label>' +
+    '<label class="fld"><span>Ton code personnel</span><input type="text" name="pcode" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC-DEF"></label>' +
+    '<p class="help">Chaque membre a son code, donné par la personne qui a créé le foyer. Ton téléphone sera relié à ton profil. Foyer sans codes : laisse vide.</p>' +
     '<p class="help" id="codeMsg" aria-live="polite"></p>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Rejoindre</button>' +
     (code ? '' : '<button type="button" class="btn" data-action="createFamily">Créer un foyer</button>') + '</div>';
@@ -1678,13 +1944,28 @@ function familySheet(){
     if (c === code) return true;
     msg.textContent = 'Vérification…';
     try {
-      const s = await (await firebaseDb(c)).doc('settings/family').get();
+      const fdb = await firebaseDb(c), s = await fdb.doc('settings/family').get();
       if (!s.exists) { msg.textContent = 'Aucun foyer ne correspond à ce code.'; return 'keep'; }
-    } catch(e) { console.error(e); msg.textContent = 'Connexion impossible. Vérifie le réseau, puis réessaie.'; return 'keep'; }
-    setFamilyCode(c); location.reload(); return 'keep';
+      const cs = await fdb.doc('settings/codes').get(), cd = cs.exists ? mergeCodes(cs.data()) : null, pc = cleanCode(val(f, 'pcode'));
+      setFamilyCode(c);
+      if (cd && pc) {
+        const who = Object.keys(cd.codes).filter(k => cd.codes[k] === pc)[0];
+        if (!who) { setFamilyCode(code); msg.textContent = 'Ce code personnel ne correspond à aucun membre de ce foyer.'; return 'keep'; }
+        setLock(who, pc);
+      } else { delete ui.lock; savePrefs(); }
+    } catch(e) { console.error(e); setFamilyCode(code); msg.textContent = 'Connexion impossible. Vérifie le réseau, puis réessaie.'; return 'keep'; }
+    location.reload(); return 'keep';
   });
 }
 function profileSheet(){
+  if (lockOk()) {
+    const me = meOf();
+    openSheet('Mon profil',
+      '<div class="center" style="margin:6px 0 10px">' + avatar(me, 84) + '<p class="big" style="margin:8px 0 0">' + esc(pname(me)) + '</p></div>' +
+      '<p class="help">Cet appareil est relié à ton profil avec ton code personnel : tu ne peux pas utiliser le profil d’un autre membre.' + (isAdmin() ? ' Tu es l’organisateur du foyer : tu vois les codes de chacun dans les Réglages.' : '') + '</p>' +
+      '<p class="center" style="margin:14px 0 0"><button type="button" class="link" data-action="lockOut">Quitter ce profil sur cet appareil</button></p>', async () => true);
+    return;
+  }
   openSheet('Qui utilise cet appareil ?',
     '<p class="help">Ton profil sert à t’accueillir, à suivre tes points et à valider les accords (échanges de corvées). Tu peux en changer à tout moment avec ton avatar en haut.</p>' +
     '<div class="menu-grid">' + activePeople().map(p => '<button type="button" class="menu-i' + (p === meOf() ? ' on' : '') + '" data-action="setMe" data-p="' + p + '">' + avatar(p, 68) + '<span>' + esc(pname(p)) + '</span></button>').join('') + '</div>' +
@@ -1808,14 +2089,14 @@ async function doSpin(){
   const g = $('#wheelG');
   const target = Math.ceil(wheelRot / 360) * 360 + 360 * 5 + (360 - (k * (360 / PRIZES.length) + 180 / PRIZES.length));
   if (g) {
-    if (fxOn()) { g.style.transition = 'transform 4s cubic-bezier(.12,.62,.16,1)'; requestAnimationFrame(() => { g.style.transform = 'rotate(' + target + 'deg)'; }); await wait(4100); }
+    if (fxOn()) { spinTicks(4000, 26); g.style.transition = 'transform 4s cubic-bezier(.12,.62,.16,1)'; requestAnimationFrame(() => { g.style.transform = 'rotate(' + target + 'deg)'; }); await wait(4100); }
     else { g.style.transition = 'none'; g.style.transform = 'rotate(' + target + 'deg)'; }
   }
   wheelRot = target % 360;
   spinning = false; revealing.delete(id);
   renderAll();
   resultSheet(prize);
-  confetti(); tone([[523,.12],[659,.12],[784,.12],[1046,.28]]);
+  confetti(); sfx(prize.id === 'joker' ? 'joker' : 'win');
 }
 function resultSheet(prize){
   openSheet('Résultat de la roue',
@@ -1857,7 +2138,7 @@ function renderHome(){
   const me = meOf(), lv = levelInfo(me), today = todayStr(), wk = curWeek();
   const hr = new Date().getHours(), hello = hr < 12 ? 'Bonjour' : hr < 18 ? 'Bon après-midi' : 'Bonsoir';
   const st = curStreak(me), sp = spinState(me);
-  const mine = state.tasks.filter(x => x.owner === me && x.status !== 'done');
+  const mine = state.tasks.filter(x => isOwner(x, me) && x.status !== 'done');
   const dueNow = mine.filter(x => (x.due && x.due <= today) || x.status === 'doing').sort(taskSort);
   const doneToday = state.points.filter(p => p.who === me && p.day === today).length;
   const tot = doneToday + dueNow.length, pct = tot ? Math.round(doneToday / tot * 100) : 0;
@@ -1872,6 +2153,9 @@ function renderHome(){
     '<div class="xp">' + xpBar(lv) + '<p>' + lv.into + ' / ' + lv.need + ' points vers le niveau ' + (lv.level + 1) + '</p></div></section>';
 
   h += '<div class="home-grid"><div>';
+  const lateL = state.canWrite ? lateTasksOf(me) : [];
+  if (lateL.length) h += '<section class="card"><header class="card-h">' + ico('bell', 20) + '<h2>À confirmer</h2><span class="muted">' + lateL.length + ' en retard</span></header>' +
+    lateL.slice(0, 5).map(x => '<div class="latel"><span class="lt"><b>' + esc(x.title) + '</b><span>Prévue ' + esc(relDate(x.due).toLowerCase()) + '</span></span><button type="button" class="btn small primary" data-action="lateAsk" data-id="' + esc(x.id) + '">Fait ?</button></div>').join('') + '</section>';
   h += '<section class="card"><header class="card-h">' + IC.flame(20) + '<h2>Aujourd’hui</h2><span class="muted">' + doneToday + ' terminée' + (doneToday > 1 ? 's' : '') + ' sur ' + tot + '</span></header>' +
     (tot ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><b style="width:' + pct + '%"></b></div>' : '') +
     (dueNow.length ? '<ul class="list">' + dueNow.slice(0, 4).map(x => taskCard(x, false)).join('') + '</ul>' + (dueNow.length > 4 ? '<p class="muted">et ' + (dueNow.length - 4) + ' autre' + (dueNow.length > 5 ? 's' : '') + '</p>' : '')
@@ -1950,7 +2234,7 @@ document.addEventListener('click', ev => {
     case 'newTask': if (state.canWrite) taskSheet(null, el.dataset.p || ''); break;
     case 'editTask': { const t = byId('tasks', id); if (t && state.canWrite) taskSheet(t); break; }
     case 'cycle': { const t = byId('tasks', id); if (t) setStatus(t, NEXT[STATUS[t.status] ? t.status : 'todo']); break; }
-    case 'assign': run(() => store.update('tasks', id, {owner: el.dataset.p, tookFromPool: true, by: meOf()})); break;
+    case 'assign': { const t = byId('tasks', id); if (t) run(() => store.set('tasks', id, Object.assign(withOwners(strip(t), [el.dataset.p]), {tookFromPool: true, by: meOf()}))); break; }
     case 'toggleCol': ui.hiddenCols[el.dataset.p] = !ui.hiddenCols[el.dataset.p]; savePrefs(); renderTasks(); break;
     case 'statusFilter': ui.status = el.dataset.s; savePrefs(); renderTasks(); break;
     case 'toggleDone': ui.hideDone = !ui.hideDone; savePrefs(); renderTasks(); break;
@@ -1959,7 +2243,11 @@ document.addEventListener('click', ev => {
     case 'addMemberRow': addMemberRow(); break;
     case 'notifOn': push.enable().then(refreshNotifBox); break;
     case 'notifOff': push.disable().then(refreshNotifBox); break;
+    case 'lateAsk': { const t = byId('tasks', id); if (t && t.status !== 'done' && state.canWrite) lateSheet(t); break; }
+    case 'lateDone': { const t = byId('tasks', id); closeSheet(); if (t) { const o = ownersOf(t).filter(x => activePeople().indexOf(x) >= 0); askWho(t, o.length ? o : [meOf()]); } break; }
+    case 'lateSnooze': { const t = byId('tasks', id); if (t) snoozeSheet(t); break; }
     case 'clearDue': { const f = $('#sheetForm'); if (f && f.elements.due) f.elements.due.value = ''; break; }
+    case 'clearRemind': { const f = $('#sheetForm'); if (f && f.elements.remindDate) { f.elements.remindDate.value = ''; f.elements.remindTime.value = ''; } break; }
     case 'closeSheet': closeSheet(); break;
     case 'family': if (store.backend === 'firebase') familySheet(); break;
     case 'reload': location.reload(); break;
@@ -1983,14 +2271,14 @@ document.addEventListener('click', ev => {
     case 'celebrate': celebrateChampion(curWeek()); break;
     case 'pactNew': if (state.canWrite) pactSheet(el.dataset.wk); break;
     case 'pactEdit': if (state.canWrite) pactSheet(el.dataset.wk); break;
-    case 'pactDone': { const pc = byId('pacts', el.dataset.wk); if (pc) run(() => store.update('pacts', pc.id, {done: !pc.done})); break; }
+    case 'pactDone': { const pc = byId('pacts', el.dataset.wk); if (pc) run(() => store.update('pacts', pc.id, {done: !pc.done})).then(ok => { if (ok && !pc.done) sfx('win'); }); break; }
     case 'preset': { const f = $('#sheetForm'); if (f && f.elements.reward) { f.elements.reward.value = el.dataset.t; const r = f.querySelector('input[name=kind][value="' + el.dataset.k + '"]'); if (r) r.checked = true; } break; }
     case 'rewardPreset': { const f = $('#sheetForm'); if (f && f.elements.collReward) f.elements.collReward.value = el.dataset.t; break; }
-    case 'missionDone': { const d = todayStr(), md = byId('missions', d), done = Object.assign({}, (md && md.done) || {}); done[meOf()] = missionIdx(); run(() => store.set('missions', d, {done})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">La maison est un peu plus douce.</p>', 2200); tone([[660,.12],[880,.16]]); } }); break; }
+    case 'missionDone': { const d = todayStr(), md = byId('missions', d), done = Object.assign({}, (md && md.done) || {}); done[meOf()] = missionIdx(); run(() => store.set('missions', d, {done})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">La maison est un peu plus douce.</p>', 2200); sfx('yay'); } }); break; }
     case 'missionShuffle': { const d = todayStr(); ui.missionShift[d] = (ui.missionShift[d] || 0) + 1; savePrefs(); renderAll(); break; }
     case 'badgeInfo': { const b = BADGES.filter(x => x.id === el.dataset.b)[0]; if (b) toast(b.name + ' : ' + b.desc + (badgesOf(meOf())[b.id] ? ' (obtenu)' : ' (à débloquer)')); break; }
     case 'jokerNew': { if (!state.canWrite) break; if (jokersLeft(meOf(), el.dataset.k) < 1) { toast('Plus de joker de ce type cette semaine.'); break; } jokerSheet(el.dataset.k); break; }
-    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.update('tasks', t.id, {owner: j.to, by: meOf()}); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) toast('Échange accepté.'); }); break; }
+    case 'jokerAccept': { const j = byId('jokers', id); if (j) run(async () => { const t = byId('tasks', j.taskId); if (t && t.status !== 'done') await store.set('tasks', t.id, Object.assign(withOwners(strip(t), ownersOf(t).filter(o => o !== j.who).concat(j.to)), {by: meOf()})); await store.update('jokers', id, {status: 'accepted'}); }).then(ok => { if (ok) { toast('Échange accepté.'); sfx('yay'); } }); break; }
     case 'jokerRefuse': run(() => store.update('jokers', id, {status: 'refused'})); break;
     case 'jokerCancel': run(() => store.update('jokers', id, {status: 'cancelled'})); break;
     case 'helpTake': run(() => store.update('jokers', id, {status: 'accepted', helper: meOf()})).then(ok => { if (ok) { pop('<div class="pts-big">Merci !</div><p class="big" style="margin:4px 0 0">Un coup de main, c’est précieux.</p>', 2400); tone([[660,.12],[880,.16]]); } }); break;
@@ -1998,12 +2286,68 @@ document.addEventListener('click', ev => {
     case 'spin': doSpin(); break;
     case 'menu': menuSheet(); break;
     case 'profile': profileSheet(); break;
-    case 'setMe': ui.me = el.dataset.p; ui.meSet = true; savePrefs(); closeSheet(); renderAll(); push.setWho(); break;
+    case 'soundTest': { const k = Object.keys(SFX).filter(x => ['done', 'joker', 'big', 'yay', 'win', 'boing'].indexOf(x) >= 0); soundDemo = (soundDemo + 1) % k.length; sfx(k[soundDemo], true); break; }
+    case 'lockOut': delete ui.lock; ui.meSet = false; savePrefs(); closeSheet(); renderAll(); break;
+    case 'leaveFamily': if (window.confirm('Quitter ce foyer sur cet appareil ? Il faudra son code pour y revenir.')) { delete ui.lock; ui.meSet = false; savePrefs(); setFamilyCode(''); location.reload(); } break;
+    case 'codesOn': {
+      if (!state.canWrite || state.codes) break;
+      const codes = {}, adm = meOf();
+      everyone().forEach(k => { codes[k] = newPersonalCode(Object.keys(codes).map(x => codes[x])); });
+      const prev = ui.lock; setLock(adm, codes[adm]);
+      run(() => store.db.doc('settings/codes').set({admin: adm, codes})).then(ok => { if (ok) { renderAll(); refreshCodesBox(); toast('Codes activés : donne à chacun le sien.'); } else { ui.lock = prev; if (!prev) delete ui.lock; savePrefs(); } });
+      break;
+    }
+    case 'codeNew': {
+      if (!isAdmin() || !state.canWrite || everyone().indexOf(el.dataset.p) < 0) break;
+      const p = el.dataset.p, codes = Object.assign({}, codesOf());
+      delete codes[p]; codes[p] = newPersonalCode(Object.keys(codes).map(x => codes[x]));
+      const old = ui.lock.c, mine = p === ui.lock.who;
+      if (mine) { ui.lock.c = codes[p]; savePrefs(); }
+      run(() => store.db.doc('settings/codes').set({admin: state.codes.admin, codes})).then(ok => { if (ok) toast('Nouveau code pour ' + pname(p) + '. L’ancien ne fonctionne plus.'); else if (mine) { ui.lock.c = old; savePrefs(); } });
+      break;
+    }
+    case 'setMe': if (lockOk()) break; ui.me = el.dataset.p; ui.meSet = true; savePrefs(); closeSheet(); renderAll(); push.setWho(); break;
     case 'prizeUsed': run(() => store.update('spins', id, {used: true})); break;
     case 'histToggle': histAll = !histAll; renderAll(); break;
   }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && sheet) closeSheet(); });
+document.addEventListener('submit', ev => { if (ev.target && ev.target.id === 'gateForm') gateSubmit(ev); });
+
+/* ---------- actualiser en tirant vers le bas (téléphone) ---------- */
+(function pullToRefresh(){
+  const el = $('#ptr'), PULL = 64, MAX = 110;
+  if (!el || !('ontouchstart' in window)) return;
+  let y0 = 0, x0 = 0, dy = 0, on = false, busy = false;
+  const free = t => !sheet && $('#pop').hidden && !(t && t.closest && t.closest('input,textarea,select,[contenteditable],.sheet')) && (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+  const show = d => {
+    const p = Math.min(1, d / PULL);
+    el.classList.remove('back'); el.style.opacity = String(Math.min(1, p * 1.2));
+    el.style.transform = 'translateY(' + (Math.min(d, MAX) - 52) + 'px)';
+    el.firstElementChild.style.transform = 'rotate(' + Math.round(p * 270) + 'deg)';
+    el.classList.toggle('go', d >= PULL);
+  };
+  const hide = () => { el.classList.add('back'); el.style.opacity = '0'; el.style.transform = 'translateY(-60px)'; el.classList.remove('go', 'spin'); };
+  document.addEventListener('touchstart', ev => {
+    on = false; dy = 0;
+    if (busy || ev.touches.length !== 1 || !free(ev.target)) return;
+    y0 = ev.touches[0].clientY; x0 = ev.touches[0].clientX; on = true;
+  }, {passive: true});
+  document.addEventListener('touchmove', ev => {
+    if (!on) return;
+    const t = ev.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
+    if (my <= 0 || Math.abs(mx) > my || !free(ev.target)) { if (dy) hide(); on = false; dy = 0; return; }
+    dy = my * .55; show(dy);
+  }, {passive: true});
+  document.addEventListener('touchend', () => {
+    if (!on) return;
+    const ok = dy >= PULL; on = false; dy = 0;
+    if (!ok) { hide(); return; }
+    busy = true; el.classList.add('spin'); el.style.opacity = '1'; el.style.transform = 'translateY(' + (PULL - 52) + 'px)';
+    setTimeout(() => location.reload(), fxOn() ? 250 : 0);
+  }, {passive: true});
+  document.addEventListener('touchcancel', () => { if (on) { on = false; dy = 0; hide(); } }, {passive: true});
+})();
 
 renderAll();
 store.init();
