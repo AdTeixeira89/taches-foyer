@@ -154,4 +154,20 @@ test('tâches en retard : une seule fois par date limite, au responsable, avec l
   await fns.sendOverdue.run({});
   assert.equal(state.sent.length, 2, 'une nouvelle date limite dépassée est de nouveau signalée');
 });
+test('tâche terminée : envoyée aux autres téléphones avec le type « done » et la vibration', async () => {
+  reset();
+  state.devices.push({id: 'd4', token: 'tok-c', who: 'c'});
+  await fns.notifyTask.run(ev({title: 'Linge', owner: 'b', status: 'doing'}, {title: 'Linge', owner: 'b', status: 'done', doneBy: 'b', pts: 2}));
+  assert.equal(state.sent.length, 1);
+  assert.deepEqual(state.sent[0].tokens, ['tok-a', 'tok-c'], 'pas les téléphones de celui qui a validé');
+  assert.deepEqual(state.sent[0].data, {kind: 'done'});
+  assert.deepEqual(state.sent[0].webpush.notification.vibrate, [120, 60, 120, 60, 240]);
+  assert.equal(state.sent[0].notification.title, 'Tâche terminée !');
+});
+test('autres messages : type « info », sans vibration imposée', async () => {
+  reset();
+  await fns.notifyWeek.run(ev(null, {champions: ['a'], max: 7}));
+  assert.deepEqual(state.sent[0].data, {kind: 'info'});
+  assert.equal('vibrate' in state.sent[0].webpush.notification, false);
+});
 function notifyLib(){ return require('./notify'); }

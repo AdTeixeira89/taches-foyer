@@ -52,7 +52,7 @@ test('tâche confiée plus tard à quelqu\'un d\'autre : seul le nouveau respons
 test('tâche modifiée : rien si le responsable ne change pas, si on se l\'attribue, si terminée, sans auteur ou sans responsable', () => {
   assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'b', by: 'a', status: 'doing'}, nameOf).length, 0);
   assert.equal(n.planTask({owner: 'b'}, {title: 't', owner: 'a', by: 'a', status: 'todo'}, nameOf).length, 0);
-  assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: 'b', by: 'a', status: 'done'}, nameOf).length, 0);
+  assert.equal(n.planTask({owner: 'a', status: 'done'}, {title: 't', owner: 'b', by: 'a', status: 'done'}, nameOf).length, 0, 'déjà terminée : rien');
   assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: 'b', status: 'todo'}, nameOf).length, 0);
   assert.equal(n.planTask({owner: 'a'}, {title: 't', owner: '', by: 'a', status: 'todo'}, nameOf).length, 0);
 });
@@ -224,4 +224,30 @@ test('date limite dépassée : rien si faite, pas encore passée, trop ancienne 
   assert.equal(n.planOverdue(t, '2026-10-20', 't').length, 0, 'plus de 7 jours : on n\'insiste plus');
   assert.equal(n.planOverdue(Object.assign({}, t, {due: ''}), '2026-10-13', 't').length, 0);
   assert.equal(n.planOverdue(null, '2026-10-13', 't').length, 0);
+});
+
+test('tâche terminée : tous les autres sont prévenus, pas celui qui a validé', () => {
+  const r = n.planTask({title: 'Linge', owner: 'b', status: 'doing'}, {title: 'Linge', owner: 'b', status: 'done', doneBy: 'b', pts: 3}, nameOf);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].to, 'all');
+  assert.equal(r[0].except, 'b');
+  assert.equal(r[0].kind, 'done');
+  assert.equal(r[0].title, 'Tâche terminée !');
+  assert.match(r[0].body, /Maman a terminé « Linge » · \+3 pts\. Bravo !/);
+  assert.ok(Array.isArray(r[0].vibrate));
+});
+test('tâche terminée à plusieurs : tous les participants nommés, points chacun', () => {
+  const r = n.planTask({title: 'Garage', owner: 'a', owners: ['a', 'c'], status: 'todo'}, {title: 'Garage', owner: 'a', owners: ['a', 'c'], status: 'done', doneBy: 'a', pts: 2}, nameOf);
+  assert.match(r[0].body, /Adao et Fille ont terminé « Garage » · \+2 pts chacun/);
+  assert.equal(r[0].except, 'a');
+});
+test('tâche terminée : rien à la création, ni si elle était déjà terminée, ni quand elle est rouverte', () => {
+  assert.equal(n.planTask(null, {title: 'x', status: 'done', createdAt: NOW, by: 'a'}, nameOf, NOW).length, 0);
+  assert.equal(n.planTask({title: 'x', status: 'done'}, {title: 'x', status: 'done', doneBy: 'a'}, nameOf).length, 0);
+  assert.equal(n.planTask({title: 'x', status: 'done', owner: 'a'}, {title: 'x', status: 'todo', owner: 'a'}, nameOf).length, 0);
+});
+test('tâche terminée sans doneBy (ancien appareil) : tout le monde est prévenu', () => {
+  const r = n.planDone({title: 'x', owner: '', status: 'done'}, nameOf);
+  assert.equal(r[0].except, '');
+  assert.match(r[0].body, /Quelqu’un a terminé « x » · \+2 pts/);
 });

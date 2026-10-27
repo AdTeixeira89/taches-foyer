@@ -20,6 +20,8 @@ Au départ, la famille compte trois profils aux noms de démonstration (Parent 1
 
 **Tâches en retard** : quand la date limite d'une tâche est passée, l'accueil affiche « À confirmer » avec un bouton « Fait ? » : on indique qui l'a faite (points attribués) ou on repousse la date. En mode Firebase avec notifications, chaque matin à 9 h (heure de Paris), le responsable (ou toute la famille si la tâche est « à prendre ») reçoit une alerte qui ouvre directement cette question, une seule fois par date limite.
 
+**Tâche terminée = les autres sont prévenus** (mode Firebase avec notifications) : quand quelqu'un valide une tâche, tous les autres reçoivent « Tâche terminée ! X a terminé « … » · +N pts. Bravo ! » (sur Android, avec une vibration spéciale). Si l'application est ouverte, elle joue aussi un son « ta-ding » dédié (un carillon discret pour les autres messages). Quand l'application est fermée, le son est celui de notification du téléphone : le navigateur ne permet pas d'imposer un son personnalisé à une notification.
+
 **Sons rigolos** : un petit son pour chaque étape (tâche créée, commencée, terminée, grande réussite, joker gagné ou envoyé, accord, lot de la roulette avec cliquetis, champion de la semaine). Ils sont activés par défaut ; Réglages > « Sons rigolos » les coupe sur l'appareil, et « Écouter un exemple » les fait entendre. Les sons sont synthétisés dans le navigateur, sans fichier audio.
 
 **Actualiser** : sur téléphone, tire la page vers le bas depuis le haut de l'écran (ou Paramètres > Actualiser l'app) pour charger la dernière version.
