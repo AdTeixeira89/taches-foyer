@@ -804,7 +804,10 @@ const push = {
     if (!token) throw new Error('Jeton de notification indisponible');
     if (!this.listening) {  // application ouverte : on affiche un message dans l'app (le navigateur n'en affiche pas)
       this.listening = true;
-      m.onMessage(messaging, p => { const n = p.notification || {}; toast((n.title ? n.title + ' : ' : '') + (n.body || '')); });
+      m.onMessage(messaging, p => {  // application ouverte : message dans l'app + son (le navigateur n'en joue pas)
+        const n = p.notification || {}; toast((n.title ? n.title + ' : ' : '') + (n.body || ''));
+        sfx(p.data && p.data.kind === 'done' ? 'bravo' : 'ding');
+      });
     }
     return token;
   },
@@ -1517,6 +1520,9 @@ const SFX = {
   whoosh: [{f: 300, to: 1400, d: .22, type: 'sawtooth', v: .04}, {f: 1400, to: 500, d: .2, at: .2, type: 'sine', v: .06}],                      // joker envoyé
   champ:  [{f: 392, to: 440, d: .2, type: 'sawtooth', v: .07, vib: 8}, {f: 392, d: .12, at: .22, type: 'sawtooth', v: .07}, {f: 523, d: .12, at: .36, type: 'sawtooth', v: .07},
            {f: 659, d: .12, at: .5, type: 'sawtooth', v: .07}, {f: 784, d: .6, at: .64, type: 'sawtooth', v: .08, vib: 7}, {f: 1046, d: .6, at: .64, type: 'sine', v: .08}],  // champion : trompette
+  ding:   [{f: 880, d: .14, type: 'sine', v: .12}, {f: 1319, d: .3, at: .12, type: 'sine', v: .12}],                                           // message reçu : carillon
+  bravo:  [{f: 784, d: .1, type: 'square', v: .06}, {f: 1046, d: .1, at: .1, type: 'square', v: .06}, {f: 1319, d: .12, at: .2, type: 'square', v: .06},
+           {f: 1568, d: .35, at: .32, type: 'square', v: .07}, {f: 2093, d: .3, at: .5, type: 'sine', v: .07}, {f: 600, to: 1800, d: .3, at: .3, type: 'sine', v: .04}],  // quelqu'un a terminé une tâche : « ta-ding ! »
   tick:   [{f: 1800, to: 900, d: .03, type: 'square', v: .05}]                                                                                // roulette : cliquetis
 };
 function sfx(name, force){
@@ -1607,7 +1613,7 @@ async function completeTask(t, whoList){
   const before = focus ? badgesOf(focus) : null;
   const lvInfo = focus ? levelInfo(focus, pts) : null, lvUp = !!focus && lvInfo.level > levelInfo(focus).level;
   const ok = await run(async () => {
-    await store.set('tasks', t.id, withOwners(Object.assign(strip(t), {status: 'done', doneAt: Date.now()}), list));
+    await store.set('tasks', t.id, withOwners(Object.assign(strip(t), {status: 'done', doneAt: Date.now(), doneBy: meOf()}), list));
     for (const r of recs) await store.set('points', r.id, r.rec);
   });
   if (!ok) return;

@@ -26,7 +26,8 @@ async function deliver(code, messages){
     const res = await getMessaging().sendEachForMulticast({
       tokens,
       notification: {title: m.title, body: m.body},
-      webpush: {fcmOptions: {link: SITE + (m.link || '')}, notification: {icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}}
+      data: {kind: m.kind || 'info'},
+      webpush: {fcmOptions: {link: SITE + (m.link || '')}, notification: Object.assign({icon: SITE + 'icon-192.png', badge: SITE + 'icon-192.png', tag: m.tag}, m.vibrate ? {vibrate: m.vibrate} : {})}
     });
     res.responses.forEach((r, i) => { if (!r.success && r.error && DEAD.indexOf(r.error.code) >= 0) dead.add(tokens[i]); });
   }

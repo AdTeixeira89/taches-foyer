@@ -24,6 +24,7 @@ const joinNames = (list, nameOf) => list.map(nameOf).join(list.length > 2 ? ', '
 // reçoit un message qui lui est destiné (et pas deux). Plus tard, une tâche confiée à quelqu'un d'autre le prévient.
 const FRESH_MS = 5 * 60 * 1000;  // on ne prévient que pour une création récente (pas pour une tâche recopiée ou restaurée)
 function planTask(before, after, nameOf, now){
+  if (before && before.status !== 'done' && after && after.status === 'done') return planDone(after, nameOf);
   if (!after || after.status === 'done') return [];
   const owners = ownersOf(after), tag = 'task-' + (after.title || '');
   const forYou = (author, others) => author + ' te confie ' + quote(after.title) + (others.length ? ' avec ' + joinNames(others, nameOf) : '');
@@ -44,6 +45,16 @@ function planTask(before, after, nameOf, now){
   const before0 = ownersOf(before);
   return owners.filter(o => before0.indexOf(o) < 0 && o !== after.by)
     .map(o => ({to: [o], title: 'Une tâche pour toi', body: forYou(nameOf(after.by), owners.filter(x => x !== o)), tag}));
+}
+
+// une tâche vient d'être terminée : tous les autres sont prévenus (« ta-ding » dans l'app ouverte, vibration en plus sur Android).
+// Celui qui a validé (doneBy) n'est pas prévenu ; les autres participants le sont (ils reçoivent aussi les points).
+const ptsOf = t => Number(t && t.pts) > 0 ? Number(t.pts) : 2;
+function planDone(task, nameOf){
+  const who = ownersOf(task), names = who.length ? joinNames(who, nameOf) : (task.doneBy ? nameOf(task.doneBy) : 'Quelqu’un');
+  const verb = who.length > 1 ? ' ont terminé ' : ' a terminé ', pts = ptsOf(task);
+  return [{to: 'all', except: task.doneBy || '', title: 'Tâche terminée !', kind: 'done', vibrate: [120, 60, 120, 60, 240],
+    body: names + verb + quote(task.title) + ' · +' + pts + ' pt' + (pts > 1 ? 's' : '') + (who.length > 1 ? ' chacun' : '') + '. Bravo !', tag: 'task-done-' + (task.title || '')}];
 }
 
 // rappel d'une tâche à l'heure choisie (champ remindAt, en millisecondes) : aux responsables, ou à tous si la tâche est « à prendre »
@@ -140,4 +151,4 @@ function pickDevices(devices, msg){
   return devices.filter(d => d && d.token && (msg.to === 'all' ? except.indexOf(d.who) < 0 : msg.to.indexOf(d.who) >= 0));
 }
 
-module.exports = {ownersOf, clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planOverdue, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, OVERDUE_DAYS, TIMEZONE};
+module.exports = {ownersOf, planDone, clip, nameResolver, planTask, planJoker, planEvent, planWeek, planReminder, planOverdue, planEventTomorrow, ymdInZone, addDaysYmd, pickDevices, dateLabel, REMIND_WINDOW_MS, OVERDUE_DAYS, TIMEZONE};
