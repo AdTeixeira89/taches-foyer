@@ -131,6 +131,8 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 .shop-list .shop-row:first-child{border-top:0}
 .shop-row .chk{width:44px;height:44px;flex:none;display:grid;place-items:center}
 .shop-row .nm{flex:1;min-width:0;text-align:left;padding:12px 4px;overflow-wrap:anywhere;font-weight:600}
+.shop-ord{display:block;font-size:12.5px;font-weight:700;color:var(--primary);margin-top:2px}
+.order-name{font-size:22px;font-weight:800;margin:6px 0 2px;overflow-wrap:anywhere}
 .shop-row.done .nm{text-decoration:line-through;color:var(--muted);font-weight:500}
 .gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
 .gate[hidden]{display:none}
@@ -2272,7 +2274,7 @@ async function shopAdd(txt){
     for (const name of names) {
       const same = state.courses.filter(c => plain(c.name) === plain(name))[0];
       if (same && !same.archived && !same.done) { dup++; continue; }
-      if (same) await store.update('courses', same.id, {done: false, archived: false, times: (Number(same.times) || 0) + 1});
+      if (same) await store.update('courses', same.id, {done: false, archived: false, ordered: false, times: (Number(same.times) || 0) + 1});
       else await store.set('courses', uid(), {name: name.charAt(0).toUpperCase() + name.slice(1), aisle: aisleOf(name), done: false, archived: false, times: 1, createdAt: Date.now(), by: meOf()});
       added++;
     }
@@ -2319,13 +2321,53 @@ function shopSheet(c){
   openSheet('Article',
     '<label class="fld"><span>Article</span><input type="text" name="name" maxlength="60" autocomplete="off" value="' + esc(c.name) + '"></label>' +
     '<div class="fld"><span class="lab">Rayon</span>' + radios('aisle', AISLES.map(a => [a[0], a[1]]), c.aisle || 'autre') + '</div>' +
+    '<label class="check"><input type="checkbox" name="ordered"' + (c.ordered ? ' checked' : '') + '><span>Déjà dans le panier du drive</span></label>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button><button type="button" class="btn danger" data-action="sheetDelete">Supprimer</button></div>',
     async f => {
       const name = val(f, 'name');
       if (!name) { f.elements.name.focus(); return false; }
-      return run(() => store.update('courses', c.id, {name, aisle: radio(f, 'aisle') || 'autre'}));
+      return run(() => store.update('courses', c.id, {name, aisle: radio(f, 'aisle') || 'autre', ordered: f.elements.ordered.checked}));
     }, {onDelete: () => deleteWithUndo('courses', c, 'Article supprimé')});
 }
+/* commande au drive : on passe les articles un par un (aucune enseigne ne permet de remplir son panier depuis une autre app) */
+let orderIds = [], orderPos = 0;
+function driveHome(){
+  const d = ui.drive || {};
+  if (DRIVES[d.kind]) return DRIVES[d.kind].home;
+  try { return new URL(String(d.url || '').replace('{produit}', 'x')).origin + '/'; } catch(e) { return ''; }
+}
+function orderStart(){
+  if (!state.canWrite) return;
+  const rank = k => AISLES.map(a => a[0]).indexOf(k || 'autre');
+  orderIds = shopTodo().filter(c => !c.ordered).sort((a, b) => rank(a.aisle) - rank(b.aisle) || (a.createdAt || 0) - (b.createdAt || 0)).map(c => c.id);
+  orderPos = 0;
+  if (!orderIds.length) { toast(shopTodo().length ? 'Tout est déjà dans le panier du drive.' : 'La liste est vide.'); return; }
+  orderSheet();
+}
+function orderSheet(){
+  // les articles déjà traités ou disparus (supprimés, pris par quelqu'un d'autre) sont sautés
+  while (orderPos < orderIds.length) { const c = byId('courses', orderIds[orderPos]); if (c && !c.archived && !c.done && !c.ordered) break; orderPos++; }
+  if (orderPos >= orderIds.length) {
+    const home = driveHome(), n = shopActive().filter(c => c.ordered && !c.done).length;
+    openSheet('Commande prête',
+      '<p class="big" style="margin:0 0 6px">' + n + ' article' + (n > 1 ? 's' : '') + ' dans le panier du drive.</p>' +
+      '<p class="help">Il ne reste qu’à ouvrir ton drive, vérifier le panier, choisir le créneau de retrait ou de livraison et payer. Les articles restent dans la liste jusqu’à ce que tu les coches à la réception.</p>' +
+      '<div class="sheet-actions">' + (home ? '<button type="button" class="btn primary" data-action="orderOpen">Ouvrir mon drive</button>' : '') + '<button type="button" class="btn" data-action="closeSheet">Fermer</button></div>', async () => false);
+    return;
+  }
+  const c = byId('courses', orderIds[orderPos]), a = (AISLES.filter(x => x[0] === (c.aisle || 'autre'))[0] || ['', 'Autres'])[1];
+  openSheet('Commande au drive',
+    '<p class="help" style="margin:0">Article ' + (orderPos + 1) + ' sur ' + orderIds.length + ' · ' + esc(a) + '</p>' +
+    '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="' + orderIds.length + '" aria-valuenow="' + orderPos + '"><b style="width:' + Math.round(orderPos / orderIds.length * 100) + '%"></b></div>' +
+    '<p class="order-name">' + esc(c.name) + '</p>' +
+    '<div class="late-opts">' +
+    '<button type="button" class="btn" data-action="orderSearch" data-id="' + esc(c.id) + '">' + ico('search', 16) + ' ' + (driveUrl() ? 'Chercher sur mon drive' : 'Choisir mon drive') + '</button>' +
+    '<button type="button" class="btn" data-action="orderCopy" data-id="' + esc(c.id) + '">Copier le nom (pour l’app du drive)</button>' +
+    '<button type="button" class="btn primary" data-action="orderDone" data-id="' + esc(c.id) + '">Je l’ai mis dans le panier du drive</button>' +
+    '<button type="button" class="btn quiet" data-action="orderSkip">Passer cet article</button>' +
+    '<button type="button" class="btn quiet" data-action="closeSheet">Arrêter pour l’instant</button></div>', async () => false);
+}
+
 function renderShop(){
   const form = $('#shopForm');
   if (!form) return;
@@ -2337,11 +2379,12 @@ function renderShop(){
   $('#shopSug').innerHTML = known.length && state.canWrite ? '<p class="help" style="margin:10px 0 0">Souvent :</p><div class="shop-sug">' + known.map(c => '<button type="button" class="chip" data-action="shopSug" data-id="' + esc(c.id) + '">+ ' + esc(c.name) + '</button>').join('') + '</div>' : '';
   const dUrl = driveUrl();
   $('#shopTools').innerHTML =
+    '<button type="button" class="btn small primary" data-action="shopOrder"' + (todo.length && state.canWrite ? '' : ' disabled') + '>' + ico('cart', 16) + ' Commander au drive' + (todo.filter(c => !c.ordered).length ? ' (' + todo.filter(c => !c.ordered).length + ')' : '') + '</button>' +
     '<button type="button" class="btn small" data-action="shopCopy"' + (todo.length ? '' : ' disabled') + '>Copier la liste</button>' +
     (navigator.share ? '<button type="button" class="btn small" data-action="shopShare"' + (todo.length ? '' : ' disabled') + '>Partager</button>' : '') +
     '<button type="button" class="btn small" data-action="shopDriveSetup">' + ico('cart', 16) + ' ' + esc(dUrl ? 'Mon drive : ' + ((ui.drive && DRIVES[ui.drive.kind] && DRIVES[ui.drive.kind].name) || 'autre') : 'Choisir mon drive') + '</button>';
   const row = c => '<li class="shop-row' + (c.done ? ' done' : '') + '"><button type="button" class="chk" data-action="shopToggle" data-id="' + esc(c.id) + '" aria-label="' + (c.done ? 'Remettre dans la liste : ' : 'Pris : ') + esc(c.name) + '">' + statusRing(c.done ? 'done' : 'todo') + '</button>' +
-    '<button type="button" class="nm" data-action="shopEdit" data-id="' + esc(c.id) + '">' + esc(c.name) + '</button>' +
+    '<button type="button" class="nm" data-action="shopEdit" data-id="' + esc(c.id) + '">' + esc(c.name) + (c.ordered && !c.done ? '<span class="shop-ord">Dans le panier du drive</span>' : '') + '</button>' +
     (c.done ? '' : '<button type="button" class="icon-btn" data-action="shopDrive" data-id="' + esc(c.id) + '" aria-label="Chercher ' + esc(c.name) + ' sur le drive" title="Chercher sur le drive">' + ico('search', 20) + '</button>') + '</li>';
   let h = '';
   AISLES.forEach(a => {
@@ -2498,10 +2541,16 @@ document.addEventListener('click', ev => {
     case 'shopToggle': { const c = byId('courses', id); if (c && state.canWrite) { const done = !c.done; run(() => store.update('courses', id, done ? {done: true, doneAt: Date.now(), doneBy: meOf()} : {done: false})).then(ok => { if (ok && done) sfx('pop'); }); } break; }
     case 'shopEdit': { const c = byId('courses', id); if (c && state.canWrite) shopSheet(c); break; }
     case 'shopSug': { const c = byId('courses', id); if (c) shopAdd(c.name); break; }
-    case 'shopClear': { const d = shopActive().filter(c => c.done); if (d.length && state.canWrite) run(async () => { for (const c of d) await store.update('courses', c.id, {archived: true}); }).then(ok => { if (ok) { sfx('yay'); toast('Panier vidé.'); } }); break; }
+    case 'shopClear': { const d = shopActive().filter(c => c.done); if (d.length && state.canWrite) run(async () => { for (const c of d) await store.update('courses', c.id, {archived: true, ordered: false}); }).then(ok => { if (ok) { sfx('yay'); toast('Panier vidé.'); } }); break; }
     case 'shopCopy': { const t = shopText(); if (t && navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast('Liste copiée.'), () => toast('Copie impossible.')); else if (t) toast('Copie impossible sur cet appareil.'); break; }
     case 'shopShare': { const t = shopText(); if (t && navigator.share) navigator.share({title: 'Courses', text: t}).catch(() => {}); break; }
     case 'shopDriveSetup': driveSheet(); break;
+    case 'shopOrder': orderStart(); break;
+    case 'orderSearch': { const c = byId('courses', id); if (!c) break; if (!driveUrl()) { driveSheet(); break; } const link = safeDriveLink(driveUrl(), c.name); if (link) window.open(link, '_blank', 'noopener'); else toast('Adresse du drive invalide : corrige-la dans « Mon drive ».'); break; }
+    case 'orderCopy': { const c = byId('courses', id); if (c && navigator.clipboard) navigator.clipboard.writeText(c.name).then(() => toast('« ' + c.name + ' » copié : colle-le dans la recherche du drive.'), () => toast('Copie impossible.')); else toast('Copie impossible sur cet appareil.'); break; }
+    case 'orderDone': { const c = byId('courses', id); if (!c) break; run(() => store.update('courses', id, {ordered: true, orderedAt: Date.now()})).then(ok => { if (ok) { sfx('pop'); orderPos++; orderSheet(); } }); break; }
+    case 'orderSkip': orderPos++; orderSheet(); break;
+    case 'orderOpen': { const h = driveHome(); if (h) window.open(h, '_blank', 'noopener'); break; }
     case 'shopDrive': { const c = byId('courses', id); if (!c) break; if (!driveUrl()) { driveSheet(); break; } const link = safeDriveLink(driveUrl(), c.name); if (link) window.open(link, '_blank', 'noopener'); else toast('Adresse du drive invalide : corrige-la dans « Mon drive ».'); break; }
     case 'mealPrev': mealWeek = ymd(addDays(parseYmd(mealWeek || curWeek()), -7)); renderMeals(); break;
     case 'mealNext': mealWeek = ymd(addDays(parseYmd(mealWeek || curWeek()), 7)); renderMeals(); break;
