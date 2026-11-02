@@ -112,6 +112,15 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 .meta{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:12px;color:var(--muted);margin-top:1px}
 .tag{color:var(--primary)}
 .late{color:var(--late)}
+.recipe-row{display:block;width:100%;text-align:left;padding:12px 4px;border-top:1px solid var(--line)}
+.shop-list>li:first-child .recipe-row{border-top:0}
+.recipe-row b{display:block;font-size:16px;margin-bottom:4px}
+.recipe-meta{display:flex;gap:6px;flex-wrap:wrap}
+.recipe-ing,.recipe-steps{margin:0 0 6px;padding-left:20px}
+.recipe-ing{list-style:none;padding-left:0}
+.recipe-ing li{padding:4px 0;border-top:1px solid var(--line)}
+.recipe-ing li:first-child{border-top:0}
+.recipe-steps li{margin:6px 0;line-height:1.45}
 .meal-day{padding:12px 14px}
 .meal-day h3{margin:0 0 6px;font-size:15px}
 .meal-day h3::first-letter{text-transform:uppercase}
@@ -157,9 +166,10 @@ main{max-width:980px;margin:0 auto;padding:12px 14px 96px}
 
 /* champs de saisie */
 @media (prefers-reduced-motion: reduce){.sheet{animation:none!important}}
-input[type=text],input[type=date],input[type=time],textarea{width:100%;min-height:42px;padding:8px 11px;font-size:16px;
+input[type=text],input[type=date],input[type=time],select,textarea{width:100%;min-height:42px;padding:8px 11px;font-size:16px;
   border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 textarea{min-height:90px;resize:vertical}
+select{color:var(--ink);font-family:inherit}
 
 /* calendar */
 .cal-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
@@ -493,7 +503,7 @@ main{padding:14px 14px 110px;max-width:1080px}
 .sheet h2{font-size:19px;font-weight:800}
 .opt>span{border-radius:999px;min-height:44px;font-weight:700}
 .opt input:checked+span{border-color:var(--brand);background:var(--tint)}
-input[type=text],input[type=date],input[type=time],textarea{border-radius:14px;min-height:46px}
+input[type=text],input[type=date],input[type=time],select,textarea{border-radius:14px;min-height:46px}
 .pop{border-radius:24px;box-shadow:0 18px 40px rgba(60,40,140,.3)}
 .pts-big{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:28px;font-weight:800}
 .pop .xpbar{margin:10px 6px 0}
@@ -1942,6 +1952,7 @@ const NAVIC = {
   cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   cart: '<path d="M3 4h2.5l2 11h10l2-8H7"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>',
+  book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
   fork: '<path d="M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M5 3v7a2 2 0 0 0 2 2"/><path d="M17 21V3c-2 1-3 4-3 8h3"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>'
@@ -2255,7 +2266,7 @@ const AISLE_WORDS = {
   viande: /poulet|boeuf|steak|porc|saucisse|poisson|saumon|thon|crevette|dinde|viande|merguez|cabillaud|haché|hache|escalope|rotis/,
   boissons: /\beau\b|jus\b|soda|coca|biere|\bvin\b|sirop|limonade|boisson|cafe en|the glace/,
   maison: /lessive|savon|shampoing|dentifrice|papier|essuie|eponge|vaisselle|poubelle|sac\b|mouchoir|couche|douche|deodorant|nettoyant|brosse|adoucissant|pile/,
-  epicerie: /pates|riz\b|farine|sucre|\bsel\b|huile|vinaigre|conserve|cereale|biscuit|chocolat|confiture|cafe|\bthe\b|pain|sauce|semoule|lentille|miel|chips|gateau|cacao|baguette|brioche|ble\b|ketchup|moutarde/
+  epicerie: /spaghetti|coquillette|nouille|tortilla|haricots rouges|pois chiche|lait de coco|coulis|pesto|semoule|lasagne|pates|riz\b|farine|sucre|\bsel\b|huile|vinaigre|conserve|cereale|biscuit|chocolat|confiture|cafe|\bthe\b|pain|sauce|semoule|lentille|miel|chips|gateau|cacao|baguette|brioche|ble\b|ketchup|moutarde/
 };
 const plain = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 function aisleOf(name){
@@ -2397,6 +2408,176 @@ function renderShop(){
   $('#shopbody').innerHTML = h;
 }
 
+/* ===== recettes proposées (catalogue intégré, pour 4 personnes ; aucune donnée enregistrée tant qu'on ne les met pas au menu) ===== */
+// t : minutes au total ; ing : [nom, quantité pour 4, unité, p] (p = produit du placard : listé mais pas ajouté aux courses) ; tags : types de repas
+const RECIPE_TAGS = [['rapide', 'Rapide'], ['proteine', 'Protéiné'], ['vegetarien', 'Végétarien'], ['leger', 'Léger'], ['economique', 'Économique'], ['familial', 'Familial'], ['poisson', 'Poisson']];
+const RECIPES = [
+  {id: 'carbonara', name: 'Pâtes carbonara express', t: 20, tags: ['rapide', 'familial', 'economique'],
+   ing: [['Spaghetti', 400, 'g'], ['Lardons', 200, 'g'], ['Œufs', 3, ''], ['Parmesan râpé', 60, 'g'], ['Poivre', 0, '', 1], ['Sel', 0, '', 1]],
+   steps: ['Fais cuire les spaghetti dans une grande casserole d’eau salée selon le temps du paquet.', 'Pendant ce temps, fais dorer les lardons à sec dans une poêle, sans matière grasse.', 'Dans un bol, bats les œufs avec le parmesan et beaucoup de poivre.', 'Égoutte les pâtes en gardant un demi-verre d’eau de cuisson, remets-les dans la casserole hors du feu avec les lardons.', 'Verse le mélange aux œufs, remue vite en ajoutant un peu d’eau de cuisson pour une sauce crémeuse. Sers aussitôt.']},
+  {id: 'omelette', name: 'Omelette aux légumes et salade', t: 20, tags: ['rapide', 'vegetarien', 'leger', 'economique'],
+   ing: [['Œufs', 8, ''], ['Courgettes', 1, ''], ['Oignon', 1, ''], ['Fromage râpé', 60, 'g'], ['Salade verte', 1, ''], ['Huile d’olive', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Coupe la courgette en petits dés et l’oignon en fines lamelles.', 'Fais-les revenir 8 minutes à la poêle avec un filet d’huile, jusqu’à ce qu’ils soient tendres.', 'Bats les œufs avec le sel, le poivre et le fromage, puis verse-les sur les légumes.', 'Cuis à feu moyen 5 minutes en ramenant les bords vers le centre, plie l’omelette en deux.', 'Sers avec la salade assaisonnée.']},
+  {id: 'poulet-rotis', name: 'Poulet rôti et pommes de terre au four', t: 70, tags: ['proteine', 'familial'],
+   ing: [['Cuisses de poulet', 4, ''], ['Pommes de terre', 800, 'g'], ['Ail', 4, 'gousses'], ['Huile d’olive', 0, '', 1], ['Herbes de Provence', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Préchauffe le four à 200 °C.', 'Épluche les pommes de terre, coupe-les en quartiers et mets-les dans un plat avec les gousses d’ail écrasées.', 'Pose les cuisses de poulet dessus, arrose d’huile, ajoute sel, poivre et herbes de Provence.', 'Enfourne 50 à 60 minutes en retournant les pommes de terre à mi-cuisson.', 'Vérifie que le jus du poulet est clair avant de servir.']},
+  {id: 'riz-cantonais', name: 'Riz cantonais', t: 25, tags: ['rapide', 'economique', 'familial'],
+   ing: [['Riz', 300, 'g'], ['Œufs', 3, ''], ['Jambon', 150, 'g'], ['Petits pois surgelés', 150, 'g'], ['Oignon', 1, ''], ['Sauce soja', 3, 'càs'], ['Huile', 0, '', 1]],
+   steps: ['Fais cuire le riz dans l’eau salée, égoutte-le et laisse-le refroidir quelques minutes.', 'Fais une omelette fine avec les œufs, coupe-la en lanières.', 'Fais revenir l’oignon émincé dans un peu d’huile, ajoute les petits pois et le jambon en dés.', 'Ajoute le riz et la sauce soja, mélange 5 minutes à feu vif, puis les lanières d’omelette.']},
+  {id: 'saumon-riz', name: 'Saumon, riz et brocoli', t: 30, tags: ['proteine', 'poisson', 'leger'],
+   ing: [['Pavés de saumon', 4, ''], ['Riz', 300, 'g'], ['Brocoli', 1, ''], ['Citron', 1, ''], ['Huile d’olive', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Fais cuire le riz dans l’eau salée.', 'Sépare le brocoli en petits bouquets et cuis-les 8 minutes à la vapeur ou à l’eau bouillante.', 'Fais cuire les pavés de saumon 4 à 5 minutes de chaque côté dans une poêle huilée, côté peau d’abord.', 'Sers avec un jus de citron, du sel et du poivre.']},
+  {id: 'soupe-legumes', name: 'Soupe de légumes et croûtons', t: 45, tags: ['leger', 'vegetarien', 'economique'],
+   ing: [['Carottes', 4, ''], ['Pommes de terre', 3, ''], ['Poireaux', 2, ''], ['Oignon', 1, ''], ['Bouillon de légumes', 1, 'cube'], ['Pain', 4, 'tranches'], ['Huile d’olive', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Épluche et coupe tous les légumes en morceaux.', 'Mets-les dans une casserole avec le cube de bouillon et 1,2 litre d’eau.', 'Laisse cuire 30 minutes à frémissement, jusqu’à ce que les légumes soient tendres.', 'Mixe, rectifie l’assaisonnement.', 'Coupe le pain en dés et fais-les griller à la poêle avec un filet d’huile : sers-les sur la soupe.']},
+  {id: 'pizza-maison', name: 'Pizza maison jambon-fromage', t: 30, tags: ['familial', 'rapide'],
+   ing: [['Pâte à pizza', 2, ''], ['Coulis de tomate', 200, 'ml'], ['Jambon', 4, 'tranches'], ['Mozzarella', 250, 'g'], ['Origan', 0, '', 1]],
+   steps: ['Préchauffe le four à 220 °C.', 'Étale les pâtes sur des plaques de cuisson.', 'Étale le coulis de tomate, ajoute le jambon déchiré, puis la mozzarella en morceaux.', 'Saupoudre d’origan et enfourne 12 à 15 minutes, jusqu’à ce que la pâte soit dorée.']},
+  {id: 'steak-puree', name: 'Steak haché et purée maison', t: 40, tags: ['proteine', 'familial'],
+   ing: [['Steaks hachés', 4, ''], ['Pommes de terre', 800, 'g'], ['Lait', 150, 'ml'], ['Beurre', 40, 'g'], ['Sel, poivre', 0, '', 1]],
+   steps: ['Épluche les pommes de terre, coupe-les en morceaux et cuis-les 20 minutes dans l’eau salée.', 'Écrase-les avec le lait chaud et le beurre jusqu’à obtenir une purée lisse.', 'Fais cuire les steaks 3 à 4 minutes de chaque côté à la poêle.', 'Sers ensemble.']},
+  {id: 'gratin-pates', name: 'Gratin de pâtes au jambon', t: 40, tags: ['familial', 'economique'],
+   ing: [['Coquillettes', 300, 'g'], ['Jambon', 200, 'g'], ['Crème fraîche', 200, 'ml'], ['Gruyère râpé', 150, 'g'], ['Sel, poivre', 0, '', 1]],
+   steps: ['Préchauffe le four à 200 °C.', 'Fais cuire les coquillettes 2 minutes de moins que le temps indiqué, égoutte-les.', 'Mélange-les avec le jambon en dés, la crème, la moitié du gruyère, du sel et du poivre.', 'Verse dans un plat, recouvre du reste de gruyère.', 'Enfourne 15 à 20 minutes, jusqu’à ce que le dessus soit doré.']},
+  {id: 'curry-pois-chiches', name: 'Curry de pois chiches et riz', t: 30, tags: ['vegetarien', 'proteine', 'economique'],
+   ing: [['Pois chiches', 2, 'boîtes'], ['Lait de coco', 400, 'ml'], ['Tomates concassées', 400, 'g'], ['Oignon', 1, ''], ['Riz', 300, 'g'], ['Curry en poudre', 2, 'càs', 1], ['Huile', 0, '', 1], ['Sel', 0, '', 1]],
+   steps: ['Fais cuire le riz dans l’eau salée.', 'Fais revenir l’oignon émincé dans un peu d’huile 5 minutes, ajoute le curry et mélange 1 minute.', 'Ajoute les tomates, le lait de coco et les pois chiches égouttés.', 'Laisse mijoter 15 minutes à feu doux, sale, et sers sur le riz.']},
+  {id: 'wraps-poulet', name: 'Wraps au poulet et crudités', t: 20, tags: ['rapide', 'proteine'],
+   ing: [['Tortillas', 8, ''], ['Blancs de poulet', 400, 'g'], ['Salade verte', 1, ''], ['Tomates', 2, ''], ['Concombre', 1, ''], ['Yaourt nature', 2, ''], ['Huile', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Coupe le poulet en lanières et fais-le dorer 8 minutes à la poêle avec un peu d’huile, sale et poivre.', 'Coupe les tomates, le concombre et émince la salade.', 'Mélange le yaourt avec du sel, du poivre et un peu de jus de citron pour la sauce.', 'Réchauffe les tortillas, garnis-les de poulet, de crudités et de sauce, puis roule-les.']},
+  {id: 'quiche-lorraine', name: 'Quiche lorraine', t: 55, tags: ['familial'],
+   ing: [['Pâte brisée', 1, ''], ['Lardons', 200, 'g'], ['Œufs', 3, ''], ['Crème fraîche', 200, 'ml'], ['Gruyère râpé', 100, 'g'], ['Sel, poivre, muscade', 0, '', 1]],
+   steps: ['Préchauffe le four à 180 °C et étale la pâte dans un moule en la piquant à la fourchette.', 'Fais dorer les lardons à sec et répartis-les sur la pâte.', 'Bats les œufs avec la crème, le sel, le poivre et la muscade, verse sur les lardons et ajoute le gruyère.', 'Enfourne 35 minutes, jusqu’à ce que la quiche soit dorée.']},
+  {id: 'poisson-pane', name: 'Poisson pané, haricots verts et pommes de terre', t: 30, tags: ['rapide', 'poisson', 'familial'],
+   ing: [['Poisson pané', 8, ''], ['Haricots verts', 500, 'g'], ['Pommes de terre', 600, 'g'], ['Beurre', 20, 'g'], ['Sel', 0, '', 1]],
+   steps: ['Épluche les pommes de terre et cuis-les 20 minutes à l’eau salée.', 'Cuis les haricots verts 10 minutes à l’eau bouillante salée ou à la vapeur.', 'Fais cuire le poisson pané au four ou à la poêle selon le paquet.', 'Sers avec une noix de beurre sur les légumes.']},
+  {id: 'salade-thon', name: 'Salade composée thon, œuf et tomate', t: 20, tags: ['rapide', 'leger', 'proteine'],
+   ing: [['Salade verte', 1, ''], ['Thon au naturel', 2, 'boîtes'], ['Œufs', 4, ''], ['Tomates', 3, ''], ['Maïs', 1, 'boîte'], ['Vinaigrette', 0, '', 1]],
+   steps: ['Fais cuire les œufs 10 minutes dans l’eau bouillante, passe-les sous l’eau froide et écale-les.', 'Lave la salade, coupe les tomates et les œufs en quartiers.', 'Dispose la salade, les tomates, le maïs, le thon émietté et les œufs dans des assiettes.', 'Assaisonne avec la vinaigrette au moment de servir.']},
+  {id: 'chili', name: 'Chili con carne et riz', t: 50, tags: ['proteine', 'familial'],
+   ing: [['Bœuf haché', 500, 'g'], ['Haricots rouges', 1, 'boîte'], ['Tomates concassées', 400, 'g'], ['Oignon', 1, ''], ['Poivron', 1, ''], ['Riz', 300, 'g'], ['Paprika, cumin, piment doux', 0, '', 1], ['Huile', 0, '', 1], ['Sel', 0, '', 1]],
+   steps: ['Fais revenir l’oignon et le poivron en dés dans un peu d’huile 5 minutes.', 'Ajoute la viande hachée et fais-la dorer en l’émiettant.', 'Ajoute les épices, les tomates et les haricots rouges égouttés, sale.', 'Laisse mijoter 30 minutes à feu doux en remuant de temps en temps.', 'Sers avec le riz cuit à l’eau salée.']},
+  {id: 'gratin-courgettes', name: 'Gratin de courgettes au chèvre', t: 50, tags: ['vegetarien', 'leger'],
+   ing: [['Courgettes', 4, ''], ['Fromage de chèvre', 150, 'g'], ['Crème fraîche', 200, 'ml'], ['Œufs', 2, ''], ['Sel, poivre', 0, '', 1]],
+   steps: ['Préchauffe le four à 190 °C.', 'Coupe les courgettes en rondelles et fais-les revenir 5 minutes à la poêle.', 'Bats les œufs avec la crème, sel et poivre.', 'Dispose les courgettes dans un plat avec le chèvre en rondelles, verse le mélange.', 'Enfourne 30 minutes.']},
+  {id: 'tortilla', name: 'Tortilla de pommes de terre', t: 40, tags: ['vegetarien', 'economique'],
+   ing: [['Pommes de terre', 600, 'g'], ['Œufs', 6, ''], ['Oignon', 1, ''], ['Huile', 0, '', 1], ['Sel', 0, '', 1]],
+   steps: ['Épluche les pommes de terre et coupe-les en fines lamelles, émince l’oignon.', 'Fais-les cuire doucement 15 minutes dans une poêle huilée, jusqu’à ce qu’elles soient tendres.', 'Bats les œufs avec du sel, mélange-les aux pommes de terre.', 'Cuis 5 minutes à feu doux, retourne la tortilla à l’aide d’une assiette et cuis encore 4 minutes.']},
+  {id: 'boulettes-dinde', name: 'Boulettes de dinde, sauce tomate et semoule', t: 35, tags: ['proteine', 'familial'],
+   ing: [['Dinde hachée', 500, 'g'], ['Coulis de tomate', 400, 'ml'], ['Semoule', 300, 'g'], ['Oignon', 1, ''], ['Œufs', 1, ''], ['Huile', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Mélange la dinde avec l’oignon haché, l’œuf, le sel et le poivre, forme des boulettes.', 'Fais-les dorer 8 minutes à la poêle huilée.', 'Ajoute le coulis de tomate et laisse mijoter 15 minutes.', 'Prépare la semoule en suivant le paquet et sers.']},
+  {id: 'crepes-salees', name: 'Crêpes salées jambon-fromage', t: 40, tags: ['familial', 'economique'],
+   ing: [['Farine', 250, 'g'], ['Œufs', 3, ''], ['Lait', 500, 'ml'], ['Jambon', 4, 'tranches'], ['Fromage râpé', 100, 'g'], ['Beurre', 20, 'g'], ['Sel', 0, '', 1]],
+   steps: ['Mélange la farine, le sel et les œufs, ajoute le lait peu à peu pour une pâte lisse. Laisse reposer 15 minutes.', 'Fais cuire les crêpes dans une poêle légèrement beurrée, environ 1 minute de chaque côté.', 'Garnis chaque crêpe de jambon et de fromage, plie-la et fais chauffer 2 minutes pour faire fondre le fromage.']},
+  {id: 'pates-pesto-poulet', name: 'Pâtes pesto, poulet et tomates cerises', t: 25, tags: ['rapide', 'proteine'],
+   ing: [['Pâtes', 400, 'g'], ['Blancs de poulet', 300, 'g'], ['Pesto', 1, 'pot'], ['Tomates cerises', 200, 'g'], ['Huile d’olive', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Fais cuire les pâtes dans l’eau salée.', 'Coupe le poulet en dés et fais-le dorer 8 minutes à la poêle avec un filet d’huile.', 'Ajoute les tomates cerises coupées en deux et cuis 3 minutes.', 'Mélange les pâtes égouttées avec le poulet, les tomates et le pesto.']},
+  {id: 'cabillaud-legumes', name: 'Cabillaud et légumes rôtis', t: 40, tags: ['leger', 'poisson', 'proteine'],
+   ing: [['Dos de cabillaud', 4, ''], ['Courgettes', 2, ''], ['Poivrons', 2, ''], ['Tomates cerises', 250, 'g'], ['Citron', 1, ''], ['Huile d’olive', 0, '', 1], ['Sel, poivre', 0, '', 1]],
+   steps: ['Préchauffe le four à 200 °C.', 'Coupe les légumes en morceaux, mets-les dans un plat avec de l’huile, du sel et du poivre, enfourne 20 minutes.', 'Pose les dos de cabillaud sur les légumes, ajoute un filet de citron.', 'Enfourne encore 12 à 15 minutes, le poisson doit s’effeuiller facilement.']},
+  {id: 'hachis', name: 'Hachis parmentier', t: 60, tags: ['familial', 'proteine'],
+   ing: [['Bœuf haché', 500, 'g'], ['Pommes de terre', 1000, 'g'], ['Oignon', 1, ''], ['Lait', 150, 'ml'], ['Beurre', 40, 'g'], ['Gruyère râpé', 80, 'g'], ['Sel, poivre', 0, '', 1]],
+   steps: ['Cuis les pommes de terre épluchées 20 minutes à l’eau salée et écrase-les avec le lait chaud et le beurre.', 'Préchauffe le four à 200 °C.', 'Fais revenir l’oignon, ajoute la viande hachée et cuis 8 minutes, sale et poivre.', 'Étale la viande dans un plat, recouvre de purée, ajoute le gruyère.', 'Enfourne 20 minutes, jusqu’à ce que le dessus soit gratiné.']},
+  {id: 'oeufs-avocat', name: 'Œufs brouillés, avocat et pain grillé', t: 15, tags: ['rapide', 'vegetarien'],
+   ing: [['Œufs', 8, ''], ['Avocats', 2, ''], ['Pain', 8, 'tranches'], ['Beurre', 20, 'g'], ['Sel, poivre', 0, '', 1]],
+   steps: ['Fais griller les tranches de pain.', 'Fais fondre le beurre à feu doux, ajoute les œufs battus avec sel et poivre et remue sans cesse jusqu’à une texture crémeuse.', 'Écrase l’avocat sur le pain, ajoute les œufs brouillés.']},
+  {id: 'nouilles-poulet', name: 'Nouilles sautées au poulet et légumes', t: 25, tags: ['rapide', 'proteine'],
+   ing: [['Nouilles', 300, 'g'], ['Blancs de poulet', 300, 'g'], ['Carottes', 2, ''], ['Courgettes', 1, ''], ['Ail', 2, 'gousses'], ['Sauce soja', 3, 'càs'], ['Huile', 0, '', 1]],
+   steps: ['Fais cuire les nouilles selon le paquet et égoutte-les.', 'Fais dorer le poulet en lanières dans une poêle ou un wok huilé, 6 minutes.', 'Ajoute les carottes en bâtonnets, la courgette et l’ail, cuis 6 minutes.', 'Ajoute les nouilles et la sauce soja, mélange 2 minutes à feu vif.']},
+  {id: 'lasagnes', name: 'Lasagnes à la bolognaise', t: 90, tags: ['familial', 'proteine'],
+   ing: [['Feuilles de lasagne', 250, 'g'], ['Bœuf haché', 500, 'g'], ['Coulis de tomate', 500, 'ml'], ['Oignon', 1, ''], ['Lait', 500, 'ml'], ['Beurre', 40, 'g'], ['Farine', 40, 'g'], ['Gruyère râpé', 100, 'g'], ['Huile', 0, '', 1], ['Sel, poivre, muscade', 0, '', 1]],
+   steps: ['Fais revenir l’oignon, ajoute la viande, puis le coulis, sale, poivre. Laisse mijoter 20 minutes.', 'Prépare la béchamel : fais fondre le beurre, ajoute la farine, puis le lait peu à peu en remuant. Sale, poivre, muscade.', 'Préchauffe le four à 180 °C.', 'Alterne dans un plat : sauce à la viande, feuilles de lasagne, béchamel. Termine par la béchamel et le gruyère.', 'Enfourne 40 minutes.']}
+];
+
+// quantités mises à l'échelle (la recette est écrite pour 4) : fractions ¼ ½ ¾ (pas de virgule, les listes de courses sont séparées par des virgules)
+const INT_UNITS = ['', 'gousses', 'tranches', 'cube', 'pot'];
+function fmtQty(v){
+  let w = Math.floor(v + 1e-9), fr = Math.round((v - w) * 4) / 4;
+  if (fr >= 1) { w += 1; fr = 0; }
+  const f = {0.25: '¼', 0.5: '½', 0.75: '¾'}[fr] || '';
+  return w > 0 ? w + f : (f || '0');
+}
+function scaleIng(ing, pers){
+  const name = ing[0], q = ing[1], u = ing[2] || '';
+  if (ing[3] || !(q > 0)) return {name, text: '', pantry: true};
+  let v = q * pers / 4, unit = u;
+  if (u === 'g' || u === 'ml') {
+    v = v < 100 ? Math.round(v / 5) * 5 : Math.round(v / 10) * 10;
+    if (v >= 1000) { v = Math.round(v / 250) / 4; unit = u === 'g' ? 'kg' : 'L'; }
+  } else if (INT_UNITS.indexOf(u) >= 0) v = Math.max(1, Math.round(v));
+  else v = Math.max(0.5, Math.round(v * 2) / 2);
+  const plural = v > 1, base = {gousses: 'gousse', tranches: 'tranche', boîtes: 'boîte', boîte: 'boîte', pot: 'pot', cube: 'cube'}[unit];
+  const label = base ? base + (plural ? 's' : '') : unit;
+  return {name, v, unit: label, text: fmtQty(v) + (label ? ' ' + label : '')};
+}
+const recipeById = id => RECIPES.filter(r => r.id === id)[0];
+const startsVowel = n => /^[aeiouyhàâéèêëîïôöûüœ]/i.test(n);
+function recipeIngLine(si){
+  if (si.pantry) return esc(si.name);
+  const lower = si.name.charAt(0).toLowerCase() + si.name.slice(1);
+  return '<b>' + esc(si.text) + '</b>' + (si.unit ? (startsVowel(lower) ? ' d’' : ' de ') : ' ') + esc(lower);
+}
+function recipeShopNames(r, pers){
+  return r.ing.map(i => scaleIng(i, pers)).filter(x => !x.pantry).map(x => x.name + ' ' + (x.unit ? x.text : '× ' + x.text));
+}
+let recipeFilter = '', recipeCtx = null;
+function recipeBrowser(ctx){
+  if (ctx !== undefined) recipeCtx = ctx;
+  const list = RECIPES.filter(r => !recipeFilter || r.tags.indexOf(recipeFilter) >= 0);
+  const tagName = k => (RECIPE_TAGS.filter(t => t[0] === k)[0] || ['', k])[1];
+  openSheet('Idées de recettes',
+    '<p class="help">' + (recipeCtx ? 'Choisis un plat pour le ' + esc((SLOTS.filter(x => x[0] === recipeCtx.slot)[0] || ['', ''])[1].toLowerCase()) + ' du ' + esc(fmtShort.format(parseYmd(recipeCtx.date))) + '.' : 'Choisis un plat : tu pourras le mettre au menu du jour que tu veux.') + '</p>' +
+    '<div class="shop-sug" style="margin:0 0 10px" role="group" aria-label="Type de repas">' +
+      [['', 'Toutes']].concat(RECIPE_TAGS).map(t => '<button type="button" class="chip" data-action="recipeTag" data-k="' + t[0] + '" aria-pressed="' + (recipeFilter === t[0]) + '">' + esc(t[1]) + '</button>').join('') + '</div>' +
+    '<ul class="shop-list">' + list.map(r => '<li><button type="button" class="recipe-row" data-action="recipeOpen" data-id="' + esc(r.id) + '"><b>' + esc(r.name) + '</b>' +
+      '<span class="recipe-meta"><span class="pill">' + ico('clock', 12) + ' ' + r.t + ' min</span>' + r.tags.map(k => '<span class="pill' + (k === recipeFilter ? ' pts' : '') + '">' + esc(tagName(k)) + '</span>').join('') + '</span></button></li>').join('') + '</ul>' +
+    '<div class="sheet-actions"><button type="button" class="btn" data-action="closeSheet">Fermer</button></div>', async () => false);
+}
+function recipeSheet(id, opts){
+  const r = recipeById(id);
+  if (!r) return;
+  opts = opts || {};
+  const ctx = recipeCtx || {}, existing = ctx.date && ctx.slot ? byId('repas', mealId(ctx.date, ctx.slot)) : null;
+  let pers = Number(opts.pers) || (existing && existing.recipe === id && Number(existing.pers)) || 4;
+  pers = Math.min(8, Math.max(2, pers));
+  const days = []; const t0 = new Date();
+  for (let i = 0; i < 14; i++) days.push(ymd(addDays(t0, i)));
+  if (ctx.date && days.indexOf(ctx.date) < 0) days.unshift(ctx.date);
+  const dateSel = ctx.date || days[0], slotSel = ctx.slot || 'soir';
+  const tagName = k => (RECIPE_TAGS.filter(t => t[0] === k)[0] || ['', k])[1];
+  openSheet(r.name,
+    '<p class="recipe-meta" style="margin:0 0 10px"><span class="pill">' + ico('clock', 12) + ' ' + r.t + ' min</span>' + r.tags.map(k => '<span class="pill">' + esc(tagName(k)) + '</span>').join('') + '</p>' +
+    '<label class="fld"><span>Pour combien de personnes ?</span><select name="pers">' + [2, 3, 4, 5, 6, 7, 8].map(n => '<option value="' + n + '"' + (n === pers ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></label>' +
+    '<p class="sub" style="margin-top:6px">Ingrédients</p><ul class="recipe-ing" id="recipeIng"></ul>' +
+    '<p class="sub">Préparation</p><ol class="recipe-steps">' + r.steps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
+    '<p class="sub">Mettre au menu</p>' +
+    '<label class="fld"><span>Jour</span><select name="date">' + days.map(d => '<option value="' + d + '"' + (d === dateSel ? ' selected' : '') + '>' + esc(fmtDayLong.format(parseYmd(d))) + '</option>').join('') + '</select></label>' +
+    '<div class="fld"><span class="lab">Moment</span>' + radios('slot', SLOTS.map(x => [x[0], x[1]]), slotSel) + '</div>' +
+    '<p class="help" id="recipeWarn" aria-live="polite"></p>' +
+    '<div class="sheet-actions"><button type="submit" class="btn primary">Mettre au menu</button></div>' +
+    '<div class="late-opts" style="margin-top:10px"><button type="button" class="btn" data-action="recipeShop" data-id="' + esc(id) + '">' + ico('cart', 16) + ' Ajouter les ingrédients aux courses</button>' +
+    (opts.back === false ? '' : '<button type="button" class="btn quiet" data-action="recipeBack">Retour aux idées</button>') + '</div>',
+    async f => {
+      const p2 = Number(f.elements.pers.value) || 4, date = f.elements.date.value, slot = radio(f, 'slot') || 'soir';
+      if (!validDate(date)) return false;
+      const ok = await run(() => store.set('repas', mealId(date, slot), {date, slot, name: r.name, items: recipeShopNames(r, p2), recipe: r.id, pers: p2, by: meOf(), at: Date.now()}));
+      if (ok) { sfx('pop'); toast('Au menu : ' + r.name + ' (' + (SLOTS.filter(x => x[0] === slot)[0] || ['', ''])[1].toLowerCase() + ', ' + fmtShort.format(parseYmd(date)) + ').'); }
+      return ok;
+    }, {recipe: id});
+  recipeRefresh();
+}
+// met à jour la liste des ingrédients (portions) et l'avertissement « remplacera… »
+function recipeRefresh(){
+  const f = $('#sheetForm');
+  if (!f || !sheet || !sheet.recipe) return;
+  const r = recipeById(sheet.recipe), pers = Number(f.elements.pers.value) || 4;
+  const all = r.ing.map(i => scaleIng(i, pers));
+  $('#recipeIng').innerHTML = all.filter(x => !x.pantry).map(x => '<li>' + recipeIngLine(x) + '</li>').join('') +
+    (all.some(x => x.pantry) ? '<li class="muted">Au placard : ' + all.filter(x => x.pantry).map(x => esc(x.name.charAt(0).toLowerCase() + x.name.slice(1))).join(', ') + '</li>' : '');
+  const date = f.elements.date.value, slot = radio(f, 'slot'), m = byId('repas', mealId(date, slot));
+  $('#recipeWarn').textContent = m && m.recipe !== r.id ? 'Remplacera : « ' + m.name + ' ».' : '';
+}
+
 /* ===== repas de la semaine (collection « repas » : un document par jour et par moment, id = date_midi ou date_soir) ===== */
 // {date, slot: 'midi'|'soir', name, items: [ingrédients], by, at}. Affichage : midi, soir ou les deux (réglage d'appareil).
 const SLOTS = [['midi', 'Midi'], ['soir', 'Soir']];
@@ -2417,12 +2598,13 @@ function mealSheet(date, slot){
   openSheet((m ? 'Modifier le repas' : 'Repas') + ' · ' + label + ' · ' + fmtShort.format(parseYmd(date)),
     '<label class="fld"><span>Au menu</span><input type="text" name="name" maxlength="80" autocomplete="off" placeholder="ex. Gratin de pâtes" value="' + esc(m ? m.name : '') + '"></label>' +
     '<label class="fld"><span>Ingrédients à acheter (facultatif, séparés par des virgules)</span><input type="text" name="items" maxlength="400" autocomplete="off" placeholder="pâtes, crème, lardons" value="' + esc(m && m.items ? m.items.join(', ') : '') + '"></label>' +
+    '<p style="margin:0 0 12px"><button type="button" class="btn small" data-action="recipeList" data-date="' + date + '" data-slot="' + slot + '">' + ico('book', 16) + ' Parcourir les recettes</button></p>' +
     '<p class="help" style="margin:0 0 4px">Idées :</p><div class="shop-sug" style="margin:0 0 12px">' + mealIdeas().map(i => '<button type="button" class="chip" data-action="mealIdea" data-t="' + esc(i.name) + '" data-i="' + esc(i.items.join(', ')) + '">' + esc(i.name) + '</button>').join('') + '</div>' +
     '<div class="sheet-actions"><button type="submit" class="btn primary">Enregistrer</button>' + (m ? '<button type="button" class="btn danger" data-action="sheetDelete">Retirer</button>' : '') + '</div>',
     async f => {
       const name = val(f, 'name').slice(0, 80);
       if (!name) { f.elements.name.focus(); return false; }
-      return run(() => store.set('repas', mealId(date, slot), {date, slot, name, items: mealItems(val(f, 'items')), by: meOf(), at: Date.now()}));
+      return run(() => store.set('repas', mealId(date, slot), Object.assign({date, slot, name, items: mealItems(val(f, 'items')), by: meOf(), at: Date.now()}, m && m.recipe && recipeById(m.recipe) && recipeById(m.recipe).name === name ? {recipe: m.recipe, pers: m.pers} : {})));
     }, m ? {onDelete: () => deleteWithUndo('repas', m, 'Repas retiré')} : {});
 }
 function renderMeals(){
@@ -2432,6 +2614,7 @@ function renderMeals(){
     '<div class="cal-bar" style="margin:0 0 8px"><button type="button" class="btn small" data-action="mealPrev" aria-label="Semaine précédente">‹</button>' +
     '<b style="flex:1;text-align:center">' + esc(weekLabel(mealWeek)) + (mealWeek === curWeek() ? ' · cette semaine' : '') + '</b>' +
     '<button type="button" class="btn small" data-action="mealNext" aria-label="Semaine suivante">›</button></div>' +
+    '<p style="margin:0 0 10px"><button type="button" class="btn small" data-action="recipeList">' + ico('book', 16) + ' Idées de recettes</button></p>' +
     '<div class="bar-row" role="group" aria-label="Moments affichés">' + [['both', 'Midi et soir'], ['midi', 'Midi'], ['soir', 'Soir']].map(o => '<button type="button" class="chip" data-action="mealSlots" data-s="' + o[0] + '" aria-pressed="' + ((ui.mealSlots || 'both') === o[0]) + '">' + o[1] + '</button>').join('') + '</div></section>';
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(start, i));
@@ -2439,6 +2622,7 @@ function renderMeals(){
       SLOTS.filter(x => shown.indexOf(x[0]) >= 0).map(x => {
         const m = byId('repas', mealId(d, x[0]));
         return '<div class="meal-slot"><span class="sl">' + x[1] + '</span><button type="button" class="mm' + (m ? '' : ' empty') + '" data-action="mealEdit" data-date="' + d + '" data-slot="' + x[0] + '"' + (state.canWrite ? '' : ' disabled') + '>' + (m ? esc(m.name) : '+ Ajouter') + '</button>' +
+          (m && m.recipe && recipeById(m.recipe) ? '<button type="button" class="icon-btn" data-action="recipeOpen" data-id="' + esc(m.recipe) + '" data-date="' + d + '" data-slot="' + x[0] + '" aria-label="Voir la recette : ' + esc(m.name) + '" title="Voir la recette">' + ico('book', 20) + '</button>' : '') +
           (m && m.items && m.items.length ? '<button type="button" class="icon-btn" data-action="mealShop" data-id="' + esc(m.id) + '" aria-label="Ajouter les ingrédients de ' + esc(m.name) + ' à la liste de courses" title="Ajouter les ingrédients à la liste de courses">' + ico('cart', 20) + '</button>' : '') + '</div>';
       }).join('') + '</section>';
   }
@@ -2552,6 +2736,11 @@ document.addEventListener('click', ev => {
     case 'orderSkip': orderPos++; orderSheet(); break;
     case 'orderOpen': { const h = driveHome(); if (h) window.open(h, '_blank', 'noopener'); break; }
     case 'shopDrive': { const c = byId('courses', id); if (!c) break; if (!driveUrl()) { driveSheet(); break; } const link = safeDriveLink(driveUrl(), c.name); if (link) window.open(link, '_blank', 'noopener'); else toast('Adresse du drive invalide : corrige-la dans « Mon drive ».'); break; }
+    case 'recipeList': recipeBrowser(validDate(el.dataset.date) && /^(midi|soir)$/.test(el.dataset.slot) ? {date: el.dataset.date, slot: el.dataset.slot} : null); break;
+    case 'recipeTag': recipeFilter = el.dataset.k || ''; recipeBrowser(); break;
+    case 'recipeOpen': { if (validDate(el.dataset.date) && /^(midi|soir)$/.test(el.dataset.slot)) { recipeCtx = {date: el.dataset.date, slot: el.dataset.slot}; const m = byId('repas', mealId(el.dataset.date, el.dataset.slot)); recipeSheet(id || el.dataset.id, {pers: m && m.pers, back: false}); } else recipeSheet(id || el.dataset.id); break; }
+    case 'recipeBack': recipeBrowser(); break;
+    case 'recipeShop': { const r = recipeById(id), f = $('#sheetForm'); if (r && state.canWrite) shopAdd(recipeShopNames(r, f && f.elements.pers ? Number(f.elements.pers.value) || 4 : 4).join(';')).then(x => { if (x && x.added) toast(x.added + ' ingrédient' + (x.added > 1 ? 's ajoutés' : ' ajouté') + ' à la liste de courses' + (x.dup ? ' (' + x.dup + ' déjà dans la liste)' : '') + '.'); else if (x && x.dup) toast('Ces ingrédients sont déjà dans la liste de courses.'); }); break; }
     case 'mealPrev': mealWeek = ymd(addDays(parseYmd(mealWeek || curWeek()), -7)); renderMeals(); break;
     case 'mealNext': mealWeek = ymd(addDays(parseYmd(mealWeek || curWeek()), 7)); renderMeals(); break;
     case 'mealSlots': ui.mealSlots = el.dataset.s; savePrefs(); renderMeals(); break;
@@ -2589,6 +2778,7 @@ document.addEventListener('paste', ev => {
   const t = (ev.clipboardData && ev.clipboardData.getData('text')) || '';
   if (/\n/.test(t.trim())) { ev.preventDefault(); shopAdd(t); }
 });
+document.addEventListener('change', ev => { if (sheet && sheet.recipe && ev.target && ev.target.form && ev.target.form.id === 'sheetForm') recipeRefresh(); });
 document.addEventListener('submit', ev => {
   if (!ev.target) return;
   if (ev.target.id === 'gateForm') gateSubmit(ev);
